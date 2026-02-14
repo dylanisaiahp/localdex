@@ -1,0 +1,15 @@
+# Rust build artifacts
+/target/
+
+# Config file (user-specific, auto-generated next to binary)
+config.toml
+
+# Editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Windows
+Thumbs.db
+Desktop.ini
