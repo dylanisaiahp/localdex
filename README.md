@@ -25,6 +25,7 @@
 - **Pipeline-friendly** — exit code `0` on match, `1` on no match (like `grep`)
 - **Launch files** — open or launch any found file directly from the terminal
 - **Multi-drive scanning** — scan all drives at once with per-drive breakdown *(Windows)*
+- **Easy install** — one-line installer with automatic PATH setup, update detection, and 4 install locations
 
 ---
 
@@ -159,7 +160,6 @@ All benchmarks performed on:
 | **OS** | Windows 11 64-bit |
 | **C:** | 500GB SSD (OS drive) |
 | **D:** | 1TB SSD (data drive) |
-| **G:** | 2TB Seagate BUP Slim BK External HDD (USB) |
 
 > All benchmarks are statistically derived from **30 warm runs** (10 + 20) and **20 cold runs** per configuration. Averages and medians reported.
 
@@ -264,7 +264,7 @@ The sweet spot depends on how many files you're scanning:
 | `C:\Program Files` | 86k | 1,372,124/s | 1,336,502/s | ~1x |
 | `D:\` | 37k | 707,140/s | 675,445/s | ~1x |
 
-> On SSD, cold and warm cache performance is nearly identical — the OS caches SSD metadata so efficiently that even "cold" scans are fast. This is very different from HDD behaviour where cold cache can be 100x+ slower.
+> On SSD, cold and warm cache performance is nearly identical — the OS caches SSD metadata so efficiently that even "cold" scans are fast.
 
 ---
 
@@ -280,11 +280,9 @@ The sweet spot depends on how many files you're scanning:
 
 ---
 
-### 🖴 HDD Benchmarks
+### 🖴 HDD / External Drive Benchmarks
 
-> HDD benchmarks were performed on a nearly empty external drive and are not representative of real-world usage. A full, fragmented HDD will perform significantly slower on cold cache scans.
-> 
-> **If you have a full HDD, please run the included `benchmark.ps1` and share your results by opening an issue — contributions welcome!**
+HDD and external drive performance varies significantly based on drive age, fragmentation, and how full it is — so we haven't included any numbers here. If you have real-world HDD benchmark results, run `benchmark.sh` and open an issue or PR with your CSV!
 
 ---
 
@@ -334,11 +332,10 @@ If you run ldx on Linux or macOS, your benchmark results are especially valuable
 - Split into multiple source files
 - Config-based scripting and user-defined aliases
 - `-g/--goto` — navigate to matched file's directory
-- Comma number formatting improvements
 
 ### Future
 - `GSX` — companion tool for game discovery (Steam, Epic, standalone)
-- Install script with automatic PATH setup
+- Pre-built binaries for Windows, Linux, and macOS
 - Linux/macOS benchmarks
 
 ---
