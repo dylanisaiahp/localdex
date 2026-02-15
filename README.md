@@ -30,25 +30,40 @@
 
 ## 📦 Installation
 
-### From source
+### One-line install (recommended)
+
+```bash
+curl -sSf https://raw.githubusercontent.com/dylanisaiahp/localdex/main/install.sh | bash
+```
+
+> **Windows users:** Run via [Git Bash](https://gitforwindows.org/).
+
+The installer will:
+- Detect if ldx is already installed and check for updates
+- Build from source (pre-built binaries coming in a future release)
+- Let you choose your install location
+- Set up PATH automatically if needed
+
+### Manual install
 
 ```bash
 git clone https://github.com/dylanisaiahp/localdex
 cd localdex
-cargo build --release
+./build.sh
 ```
 
-The binary will be at `target/release/localdex` (or `localdex.exe` on Windows).
+### Install locations
 
-### Windows quick setup
+The installer offers 4 options per platform:
 
-Copy `localdex.exe` to a folder in your PATH (e.g. `C:\Tools\`) and optionally alias it:
+| Option | Windows | Linux / macOS |
+|--------|---------|---------------|
+| 1 (default) | `%USERPROFILE%\.cargo\bin` ✅ already in PATH | `~/.cargo/bin` ✅ already in PATH |
+| 2 | `%USERPROFILE%\bin` | `~/.local/bin` |
+| 3 | `C:\Program Files\ldx` | `/usr/local/bin` |
+| 4 | Custom | Custom |
 
-```powershell
-copy C:\Tools\localdex.exe C:\Tools\ldx.exe
-```
-
-On first run, `config.toml` will be auto-generated next to the binary.
+> **Note:** Examples in this README use `ldx` assuming it's in your PATH. If you chose a custom location, either add it to PATH or use the full path to the binary.
 
 ---
 
@@ -279,15 +294,37 @@ The sweet spot depends on how many files you're scanning:
 
 ---
 
-## 🔧 Build Script (Windows)
+## 🔧 Scripts
 
-A `build.ps1` script is included for quick build and deploy:
+| Script | Description |
+|--------|-------------|
+| `install.sh` | Install or update ldx — detects existing installs, checks for updates, builds from source |
+| `build.sh` | Build and deploy ldx — supports `--debug`, `--release`, `--dest` |
+| `benchmark.sh` | Benchmark ldx across directories and thread counts — outputs labeled CSV |
 
-```powershell
-.\build.ps1
+All scripts are cross-platform and run on Windows via [Git Bash](https://gitforwindows.org/).
+
+```bash
+# Install
+./install.sh
+
+# Build with options
+./build.sh --release --dest ~/.local/bin
+
+# Benchmark (warm cache, 20 runs)
+./benchmark.sh --runs 20 --warm
+
+# Benchmark (cold cache — run immediately after reboot)
+./benchmark.sh --runs 20 --cold
 ```
 
-This builds in release mode, copies the binary to `C:\Tools\`, creates the `ldx.exe` alias, and copies `config.toml`.
+---
+
+## 🤝 Contributing
+
+Contributions are welcome! See [CONTRIBUTING.md](CONTRIBUTING.md) for build instructions, benchmark guidelines, and PR requirements.
+
+If you run ldx on Linux or macOS, your benchmark results are especially valuable — open an issue or PR with your CSV files!
 
 ---
 
