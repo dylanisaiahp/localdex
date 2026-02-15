@@ -189,11 +189,26 @@ setup_path() {
 
 # ─── Install from source ──────────────────────────────────────────────────────
 install_from_source() {
-    # Check for cargo
+    # Check for cargo — auto-install rustup if missing
     if ! command -v cargo &> /dev/null; then
-        echo -e "${RED}cargo not found.${RESET}"
-        echo -e "Install Rust first: ${CYAN}https://rustup.rs${RESET}"
-        exit 1
+        echo -e "${YELLOW}Rust/cargo not found.${RESET}"
+        echo -e "${CYAN}Installing Rust via rustup...${RESET}"
+        echo ""
+        if command -v curl &> /dev/null; then
+            curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+        elif command -v wget &> /dev/null; then
+            wget -qO- https://sh.rustup.rs | sh -s -- -y
+        else
+            echo -e "${RED}Neither curl nor wget found. Please install Rust manually: https://rustup.rs${RESET}"
+            exit 1
+        fi
+        # Source cargo env so it's available in this session
+        if [ -f "$HOME/.cargo/env" ]; then
+            source "$HOME/.cargo/env"
+        fi
+        echo ""
+        echo -e "${GREEN}✓ Rust installed successfully!${RESET}"
+        echo ""
     fi
 
     # Clone if not already in repo
