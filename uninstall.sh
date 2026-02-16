@@ -125,24 +125,9 @@ echo ""
 echo -e "${BOLD}What would you like to do?${RESET}"
 echo ""
 
-if [ "$HAS_CONFIG" = true ] && [ "$HAS_SOURCE" = true ]; then
-    echo -e "  ${CYAN}1)${RESET} Uninstall ldx only (keep config and source)"
-    echo -e "  ${CYAN}2)${RESET} Uninstall ldx and config (keep source)"
-    echo -e "  ${CYAN}3)${RESET} Uninstall everything (binaries, config, and source)"
-    echo -e "  ${CYAN}4)${RESET} Exit"
-    echo ""
-    read -rp "Choice [1-4] (default: 1): " CHOICE
-    CHOICE=${CHOICE:-1}
-elif [ "$HAS_CONFIG" = true ]; then
-    echo -e "  ${CYAN}1)${RESET} Uninstall ldx (keep config.toml)"
-    echo -e "  ${CYAN}2)${RESET} Uninstall ldx and config.toml"
-    echo -e "  ${CYAN}3)${RESET} Exit"
-    echo ""
-    read -rp "Choice [1-3] (default: 1): " CHOICE
-    CHOICE=${CHOICE:-1}
-elif [ "$HAS_SOURCE" = true ]; then
-    echo -e "  ${CYAN}1)${RESET} Uninstall ldx (keep source)"
-    echo -e "  ${CYAN}2)${RESET} Uninstall ldx and source"
+if [ "$HAS_SOURCE" = true ]; then
+    echo -e "  ${CYAN}1)${RESET} Uninstall binaries only (keep source)"
+    echo -e "  ${CYAN}2)${RESET} Uninstall everything (binaries, config, and source)"
     echo -e "  ${CYAN}3)${RESET} Exit"
     echo ""
     read -rp "Choice [1-3] (default: 1): " CHOICE
@@ -153,32 +138,13 @@ else
     echo ""
     read -rp "Choice [1-2] (default: 1): " CHOICE
     CHOICE=${CHOICE:-1}
-    
-    # Map choice 2 to exit
-    if [ "$CHOICE" = "2" ]; then
-        CHOICE=4
-    fi
 fi
 
-REMOVE_CONFIG=false
+# Config is always removed (regenerates automatically)
+REMOVE_CONFIG=true
 REMOVE_SOURCE=false
 
-if [ "$HAS_CONFIG" = true ] && [ "$HAS_SOURCE" = true ]; then
-    case "$CHOICE" in
-        1) REMOVE_CONFIG=false; REMOVE_SOURCE=false ;;
-        2) REMOVE_CONFIG=true; REMOVE_SOURCE=false ;;
-        3) REMOVE_CONFIG=true; REMOVE_SOURCE=true ;;
-        4) echo -e "${CYAN}Exiting.${RESET}"; exit 0 ;;
-        *) echo -e "${RED}Invalid choice. Exiting.${RESET}"; exit 1 ;;
-    esac
-elif [ "$HAS_CONFIG" = true ]; then
-    case "$CHOICE" in
-        1) REMOVE_CONFIG=false ;;
-        2) REMOVE_CONFIG=true ;;
-        3) echo -e "${CYAN}Exiting.${RESET}"; exit 0 ;;
-        *) echo -e "${RED}Invalid choice. Exiting.${RESET}"; exit 1 ;;
-    esac
-elif [ "$HAS_SOURCE" = true ]; then
+if [ "$HAS_SOURCE" = true ]; then
     case "$CHOICE" in
         1) REMOVE_SOURCE=false ;;
         2) REMOVE_SOURCE=true ;;
@@ -188,7 +154,7 @@ elif [ "$HAS_SOURCE" = true ]; then
 else
     case "$CHOICE" in
         1) ;; # Just uninstall
-        4) echo -e "${CYAN}Exiting.${RESET}"; exit 0 ;;
+        2) echo -e "${CYAN}Exiting.${RESET}"; exit 0 ;;
         *) echo -e "${RED}Invalid choice. Exiting.${RESET}"; exit 1 ;;
     esac
 fi
