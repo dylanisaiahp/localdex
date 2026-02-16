@@ -15,6 +15,7 @@ pub struct Config {
     pub case_sensitive: bool,
     pub quiet: bool,
     pub all: bool,
+    pub dirs_only: bool,
     pub extension: Option<String>,
     pub matcher: Option<AhoCorasick>,
     pub limit: Option<usize>,
@@ -61,6 +62,7 @@ pub fn scan_dir(dir: &PathBuf, config: &Config) -> ScanResult {
     walker.run(|| {
         let ext = config.extension.clone();
         let all = config.all;
+        let dirs_only = config.dirs_only;
         let case_sensitive = config.case_sensitive;
         let quiet = config.quiet;
         let collect_paths = config.collect_paths;
@@ -85,6 +87,45 @@ pub fn scan_dir(dir: &PathBuf, config: &Config) -> ScanResult {
 
             if ft.is_dir() {
                 dirs_count.fetch_add(1, Ordering::Relaxed);
+
+                if dirs_only {
+                    // Skip the root dir itself
+                    if entry.depth() == 0 {
+                        return WalkState::Continue;
+                    }
+
+                    let matched = if let Some(ref m) = matcher {
+                        let name = entry.file_name().to_string_lossy();
+                        m.is_match(name.as_ref())
+                    } else {
+                        true
+                    };
+
+                    if matched {
+                        let mc = matches.fetch_add(1, Ordering::Relaxed) + 1;
+
+                        if collect_paths
+                            && let Ok(mut p) = paths.lock() {
+                            p.push(entry.path().to_path_buf());
+                        }
+
+                        if !quiet {
+                            let rel = entry.path().strip_prefix(&scan_dir).unwrap_or(entry.path());
+                            let disp = if rel.as_os_str().is_empty() {
+                                ".".to_string()
+                            } else {
+                                rel.to_string_lossy().into_owned()
+                            };
+                            println!("{}", disp.bright_cyan());
+                        }
+
+                        if let Some(lim) = limit
+                            && mc >= lim {
+                            return WalkState::Quit;
+                        }
+                    }
+                }
+
                 return WalkState::Continue;
             }
             if !ft.is_file() {
@@ -92,6 +133,11 @@ pub fn scan_dir(dir: &PathBuf, config: &Config) -> ScanResult {
             }
 
             files.fetch_add(1, Ordering::Relaxed);
+
+            // Skip files when in dirs_only mode
+            if dirs_only {
+                return WalkState::Continue;
+            }
 
             let matched = if all {
                 true

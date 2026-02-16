@@ -44,22 +44,28 @@ long = "dir"
 description = "Directory to search (default: current)"
 os = "all"
 
+[flags.dirs]
+short = "D"
+long = "dirs"
+description = "Search for directories instead of files"
+os = "all"
+
 [flags.extension]
 short = "e"
 long = "extension"
 description = "Search by file extension (e.g. pdf, rs)"
 os = "all"
 
+[flags.where]
+short = "w"
+long = "where"
+description = "Print the path of the matched file or directory with a cd hint"
+os = "all"
+
 [flags.first]
 short = "1"
 long = "first"
 description = "Stop after the first match"
-os = "all"
-
-[flags.goto]
-short = "g"
-long = "goto"
-description = "Print the cd command to navigate to the matched file"
 os = "all"
 
 [flags.help]

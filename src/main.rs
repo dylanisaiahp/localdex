@@ -51,6 +51,8 @@ fn main() -> Result<()> {
     let verbose = args.contains(["-v", "--verbose"]);
     let first = args.contains(["-1", "--first"]);
     let open = args.contains(["-o", "--open"]);
+    let dirs_only = args.contains(["-D", "--dirs"]);
+    let where_mode = args.contains(["-w", "--where"]);
     let max_threads = num_cpus::get();
     let threads: usize = {
         let requested: Option<usize> = args.opt_value_from_str(["-t", "--threads"])?;
@@ -77,7 +79,7 @@ fn main() -> Result<()> {
         bail!("-1/--first and -L/--limit cannot be used together. Run with --help for usage.");
     }
 
-    let limit = if first { Some(1) } else { limit };
+    let limit = if first || where_mode { Some(1) } else { limit };
 
     let pattern_opt: Option<String> = args.opt_free_from_str()?;
 
@@ -103,6 +105,14 @@ fn main() -> Result<()> {
 
     if open && all {
         bail!("-o/--open cannot be combined with -a/--all-files. Run with --help for usage.");
+    }
+
+    if dirs_only && all {
+        bail!("-D/--dirs cannot be combined with -a/--all-files. Run with --help for usage.");
+    }
+
+    if dirs_only && extension.is_some() {
+        bail!("-D/--dirs cannot be combined with -e/--extension. Run with --help for usage.");
     }
 
     if pattern_opt.is_some() && extension.is_some() {
@@ -173,11 +183,12 @@ fn main() -> Result<()> {
             case_sensitive,
             quiet,
             all,
+            dirs_only,
             extension,
             matcher,
             limit,
             threads,
-            collect_paths: open,
+            collect_paths: open || where_mode,
         };
 
         let result = scan_dir(&dir, &config);
@@ -188,6 +199,13 @@ fn main() -> Result<()> {
                 "Found {} file{} in {:.3}s",
                 fmt_num(result.matches),
                 if result.matches == 1 { "" } else { "s" },
+                result.duration.as_secs_f64()
+            );
+        } else if dirs_only {
+            println!(
+                "Found {} matching director{} in {:.3}s",
+                fmt_num(result.matches),
+                if result.matches == 1 { "y" } else { "ies" },
                 result.duration.as_secs_f64()
             );
         } else {
@@ -231,6 +249,26 @@ fn main() -> Result<()> {
                 _ => prompt_and_open(&result.paths)?,
             }
         }
+
+        if where_mode {
+            match result.paths.len() {
+                0 => {}
+                1 => {
+                    let path = &result.paths[0];
+                    let dir_path = if dirs_only {
+                        path.to_string_lossy().into_owned()
+                    } else {
+                        path.parent()
+                            .map(|p| p.to_string_lossy().into_owned())
+                            .unwrap_or_else(|| path.to_string_lossy().into_owned())
+                    };
+                    println!("  → cd {}", dir_path);
+                }
+                _ => {
+                    println!("  → Multiple results found, use -1 to get a single match");
+                }
+            }
+        }
     } else {
         // -A / --all-drives
         #[cfg(windows)]
@@ -254,6 +292,7 @@ fn main() -> Result<()> {
                 case_sensitive,
                 quiet,
                 all,
+                dirs_only,
                 extension,
                 matcher,
                 limit,
