@@ -4,7 +4,7 @@
 
 **A blazing-fast file search CLI for Windows, Linux, and macOS**
 
-[![Version](https://img.shields.io/badge/version-0.0.2-blue.svg)](https://github.com/dylanisaiahp/localdex)
+[![Version](https://img.shields.io/badge/version-0.0.3-blue.svg)](https://github.com/dylanisaiahp/localdex)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![Built with Rust](https://img.shields.io/badge/built%20with-Rust-orange.svg)](https://www.rust-lang.org/)
 [![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20Linux%20%7C%20macOS-lightgrey.svg)](https://github.com/dylanisaiahp/localdex)
@@ -328,15 +328,31 @@ If you run ldx on Linux or macOS, your benchmark results are especially valuable
 
 ## 🗺️ Roadmap
 
-### v0.0.3
-- Split into multiple source files
-- Config-based scripting and user-defined aliases
+### v0.0.4
 - `-g/--goto` — navigate to matched file's directory
+- Config-based scripting and user-defined aliases
+
+### v0.1.0 (stable)
+- Codebase audit — cut bloat, improve clarity
+- Unit tests for edge cases
+- Full Linux and macOS benchmark data
 
 ### Future
 - `GSX` — companion tool for game discovery (Steam, Epic, standalone)
 - Pre-built binaries for Windows, Linux, and macOS
-- Linux/macOS benchmarks
+- GitHub Actions CI
+
+---
+
+## 🔢 Version Scheme
+
+| Range | Stage | Description |
+|-------|-------|-------------|
+| `v0.0.X` | **experimental** | Early development, anything can change |
+| `v0.X.X` | **stable** | Feature complete, production usable |
+| `v26.X` | **release** | Year-versioned, fully polished |
+
+> The jump from `v0.X.X` to `v26.X` is intentional — the year prefix signals a production-ready release, not 26 major versions. Inspired by Ubuntu's year-based versioning.
 
 ---
 
