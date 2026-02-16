@@ -32,7 +32,7 @@ fn main() -> Result<()> {
     }
 
     if args.contains("--version") {
-        println!("localdex v0.0.3");
+        println!("localdex v0.0.4");
         return Ok(());
     }
 

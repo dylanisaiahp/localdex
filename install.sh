@@ -245,10 +245,31 @@ install_from_source() {
     setup_path
 
     # Clean up cloned dir if we cloned
+    CLONED_SOURCE=false
+    SOURCE_PATH=""
     if [ -d "../localdex-src" ] || [ "$(basename "$PWD")" = "localdex-src" ]; then
+        CLONED_SOURCE=true
         cd ..
-        if [ "$KEEP_SOURCE" = true ]; then
-            echo -e "${CYAN}✓ Source kept at: $(pwd)/localdex-src${RESET}"
+        SOURCE_PATH="$(pwd)/localdex-src"
+        
+        echo ""
+        echo -e "${YELLOW}Keep source code for future updates/modifications?${RESET}"
+        read -rp "Keep source? [Y/n]: " KEEP_SRC
+        KEEP_SRC=${KEEP_SRC:-Y}
+        
+        if [[ "$KEEP_SRC" =~ ^[Yy]$ ]]; then
+            echo -e "${CYAN}✓ Source kept at: $SOURCE_PATH${RESET}"
+            
+            # Save source path to config.toml
+            CONFIG_FILE="$DEST/config.toml"
+            if [ -f "$CONFIG_FILE" ]; then
+                # Add meta section if it doesn't exist
+                if ! grep -q "\[meta\]" "$CONFIG_FILE"; then
+                    echo "" >> "$CONFIG_FILE"
+                    echo "[meta]" >> "$CONFIG_FILE"
+                    echo "source_path = "$SOURCE_PATH"" >> "$CONFIG_FILE"
+                fi
+            fi
         else
             rm -rf localdex-src
             echo -e "${GREEN}✓ Cleaned up source${RESET}"

@@ -123,7 +123,7 @@ See [BENCHMARKS.md](BENCHMARKS.md) for full thread scaling tables, cold vs warm 
 | `install.sh` | Install or update ldx — detects existing installs, checks for updates |
 | `build.sh` | Build and deploy ldx |
 | `benchmark.sh` | Benchmark across directories and thread counts — outputs CSV |
-| `uninstall.sh` | Cleanly remove ldx from your system *(coming soon)* |
+| `uninstall.sh` | Cleanly remove ldx from your system |
 
 All scripts run on Windows via [Git Bash](https://gitforwindows.org/).
 
