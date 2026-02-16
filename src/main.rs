@@ -1,410 +1,22 @@
+mod config;
+mod display;
+mod launcher;
+mod search;
+
 use aho_corasick::{AhoCorasick, AhoCorasickBuilder};
 use anyhow::{Result, bail};
-use colored::Colorize;
 use dirs::home_dir;
-use ignore::{DirEntry, WalkBuilder, WalkState};
 use pico_args::Arguments;
-use serde::Deserialize;
-use std::collections::HashMap;
-use std::ffi::OsStr;
 use std::path::PathBuf;
-use std::sync::atomic::{AtomicUsize, Ordering};
-use std::sync::{Arc, Mutex};
 use std::time::Instant;
 
-// ---------------------------------------------------------------------------
-// Config file structures
-// ---------------------------------------------------------------------------
-
-#[derive(Debug, Deserialize)]
-struct FlagDef {
-    short: String,
-    long: String,
-    description: String,
-    os: String,
-}
-
-#[derive(Debug, Deserialize)]
-struct LdxConfig {
-    #[serde(default)]
-    flags: HashMap<String, FlagDef>,
-}
-
-const DEFAULT_CONFIG: &str = r#"# ldx configuration file
-# Edit this file to customise flags and behaviour
-#
-# os values: "all", "windows", "linux", "macos"
-
-[flags.all-files]
-short = "a"
-long = "all-files"
-description = "Count all files, no filter needed"
-os = "all"
-
-[flags.all-drives]
-short = "A"
-long = "all-drives"
-description = "Scan all drives with a per-drive breakdown and total"
-os = "windows"
-
-[flags.dir]
-short = "d"
-long = "dir"
-description = "Directory to search (default: current)"
-os = "all"
-
-[flags.extension]
-short = "e"
-long = "extension"
-description = "Search by file extension (e.g. pdf, rs)"
-os = "all"
-
-[flags.first]
-short = "1"
-long = "first"
-description = "Stop after the first match"
-os = "all"
-
-[flags.goto]
-short = "g"
-long = "goto"
-description = "Print the cd command to navigate to the matched file"
-os = "all"
-
-[flags.help]
-short = "h"
-long = "help"
-description = "Show this help message"
-os = "all"
-
-[flags.limit]
-short = "L"
-long = "limit"
-description = "Stop after N matches (e.g. -L 5)"
-os = "all"
-
-[flags.open]
-short = "o"
-long = "open"
-description = "Open or launch the matched file"
-os = "all"
-
-[flags.quiet]
-short = "q"
-long = "quiet"
-description = "Suppress per-file output; still prints summary count"
-os = "all"
-
-[flags.case-sensitive]
-short = "s"
-long = "case-sensitive"
-description = "Case-sensitive search"
-os = "all"
-
-[flags.stats]
-short = "S"
-long = "stats"
-description = "Show scan statistics"
-os = "all"
-
-[flags.threads]
-short = "t"
-long = "threads"
-description = "Number of threads to use (default: all available)"
-os = "all"
-
-[flags.verbose]
-short = "v"
-long = "verbose"
-description = "Show detailed scan breakdown (files + dirs separately)"
-os = "all"
-"#;
-
-fn load_config() -> Result<LdxConfig> {
-    let config_path = std::env::current_exe()
-        .unwrap_or_else(|_| PathBuf::from("."))
-        .parent()
-        .unwrap_or_else(|| std::path::Path::new("."))
-        .join("config.toml");
-
-    if !config_path.exists() {
-        std::fs::write(&config_path, DEFAULT_CONFIG)?;
-    }
-
-    let contents = std::fs::read_to_string(&config_path)?;
-    let config: LdxConfig = toml::from_str(&contents)?;
-    Ok(config)
-}
-
-fn is_flag_available(flag: &FlagDef) -> bool {
-    match flag.os.as_str() {
-        "all" => true,
-        #[cfg(windows)]
-        "windows" => true,
-        #[cfg(target_os = "linux")]
-        "linux" => true,
-        #[cfg(target_os = "macos")]
-        "macos" => true,
-        _ => false,
-    }
-}
-
-fn print_help(config: &LdxConfig) {
-    println!(
-        "Usage: ldx [pattern] [options]\n\
-        \n\
-        Examples:\n\
-          ldx invoice.pdf                  # basename substring search\n\
-          ldx -e pdf -q                    # count all .pdf files quietly\n\
-          ldx rs -d D:\\Development        # find files with 'rs' in name\n\
-          ldx -a -S -d C:\\               # count every file on C:\\\n\
-          ldx -a -A -S                     # count every file on all drives\n\
-        \n\
-        Options:"
-    );
-
-    let mut flags: Vec<&FlagDef> = config
-        .flags
-        .values()
-        .filter(|f| is_flag_available(f))
-        .collect();
-
-    flags.sort_by(|a, b| a.long.cmp(&b.long));
-
-    for flag in flags {
-        println!(
-            "  -{}, --{:<20} {}",
-            flag.short, flag.long, flag.description
-        );
-    }
-
-    println!("  --version                    Show version");
-}
-
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
-fn fmt_num(n: usize) -> String {
-    let s = n.to_string();
-    let mut result = String::new();
-    for (i, c) in s.chars().rev().enumerate() {
-        if i > 0 && i % 3 == 0 {
-            result.push(',');
-        }
-        result.push(c);
-    }
-    result.chars().rev().collect()
-}
-
-// ---------------------------------------------------------------------------
-// Scan result
-// ---------------------------------------------------------------------------
-
-struct ScanResult {
-    matches: usize,
-    files: usize,
-    dirs: usize,
-    duration: std::time::Duration,
-    paths: Vec<PathBuf>,
-}
-
-// ---------------------------------------------------------------------------
-// Runtime config
-// ---------------------------------------------------------------------------
-
-struct Config {
-    case_sensitive: bool,
-    quiet: bool,
-    all: bool,
-    extension: Option<String>,
-    matcher: Option<AhoCorasick>,
-    limit: Option<usize>,
-    threads: usize,
-    collect_paths: bool,
-}
-
-// ---------------------------------------------------------------------------
-// Single drive/directory scan
-// ---------------------------------------------------------------------------
-
-fn scan_dir(dir: &PathBuf, config: &Config) -> ScanResult {
-    let mut builder = WalkBuilder::new(dir);
-    builder
-        .standard_filters(false)
-        .ignore(false)
-        .parents(false)
-        .hidden(false)
-        .follow_links(false)
-        .same_file_system(false)
-        .threads(config.threads);
-
-    let walker = builder.build_parallel();
-
-    let matches = Arc::new(AtomicUsize::new(0));
-    let files = Arc::new(AtomicUsize::new(0));
-    let dirs_count = Arc::new(AtomicUsize::new(0));
-    let paths: Arc<Mutex<Vec<PathBuf>>> = Arc::new(Mutex::new(Vec::new()));
-
-    let start = Instant::now();
-
-    walker.run(|| {
-        let ext = config.extension.clone();
-        let all = config.all;
-        let case_sensitive = config.case_sensitive;
-        let quiet = config.quiet;
-        let collect_paths = config.collect_paths;
-        let scan_dir = dir.clone();
-        let matcher = config.matcher.clone();
-        let matches = Arc::clone(&matches);
-        let files = Arc::clone(&files);
-        let dirs_count = Arc::clone(&dirs_count);
-        let paths = Arc::clone(&paths);
-        let limit = config.limit;
-
-        Box::new(move |res: Result<DirEntry, _>| -> WalkState {
-            let entry = match res {
-                Ok(e) => e,
-                Err(_) => return WalkState::Continue,
-            };
-
-            let ft = match entry.file_type() {
-                Some(ft) => ft,
-                None => return WalkState::Continue,
-            };
-
-            if ft.is_dir() {
-                dirs_count.fetch_add(1, Ordering::Relaxed);
-                return WalkState::Continue;
-            }
-            if !ft.is_file() {
-                return WalkState::Continue;
-            }
-
-            files.fetch_add(1, Ordering::Relaxed);
-
-            let matched = if all {
-                true
-            } else if let Some(ref ext) = ext {
-                entry.path().extension().is_some_and(|e| {
-                    if case_sensitive {
-                        e == OsStr::new(ext)
-                    } else {
-                        e.eq_ignore_ascii_case(OsStr::new(ext))
-                    }
-                })
-            } else if let Some(ref m) = matcher {
-                let name = entry.file_name().to_string_lossy();
-                m.is_match(name.as_ref())
-            } else {
-                false
-            };
-
-            if matched {
-                let mc = matches.fetch_add(1, Ordering::Relaxed) + 1;
-
-                if collect_paths && let Ok(mut p) = paths.lock() {
-                    p.push(entry.path().to_path_buf());
-                }
-
-                if !quiet && !all {
-                    let rel = entry.path().strip_prefix(&scan_dir).unwrap_or(entry.path());
-                    let disp = if rel.as_os_str().is_empty() {
-                        ".".to_string()
-                    } else {
-                        rel.to_string_lossy().into_owned()
-                    };
-                    println!("{}", disp.bright_cyan());
-                }
-
-                if let Some(lim) = limit
-                    && mc >= lim
-                {
-                    return WalkState::Quit;
-                }
-            }
-
-            WalkState::Continue
-        })
-    });
-
-    let collected_paths = Arc::try_unwrap(paths)
-        .unwrap_or_default()
-        .into_inner()
-        .unwrap_or_default();
-
-    ScanResult {
-        matches: matches.load(Ordering::Relaxed),
-        files: files.load(Ordering::Relaxed),
-        dirs: dirs_count.load(Ordering::Relaxed),
-        duration: start.elapsed(),
-        paths: collected_paths,
-    }
-}
-
-// ---------------------------------------------------------------------------
-// Windows: enumerate all drives
-// ---------------------------------------------------------------------------
+use config::load_config;
+use display::{fmt_num, print_help};
+use launcher::{open_file, prompt_and_open};
+use search::{Config, scan_dir};
 
 #[cfg(windows)]
-fn get_all_drives() -> Vec<PathBuf> {
-    ('A'..='Z')
-        .map(|c| PathBuf::from(format!("{}:\\", c)))
-        .filter(|p| p.exists())
-        .collect()
-}
-
-// ---------------------------------------------------------------------------
-// Open a file with the OS default handler
-// ---------------------------------------------------------------------------
-
-fn open_file(path: &std::path::Path) -> Result<()> {
-    println!("{} {}", "Launching:".green().bold(), path.display());
-
-    #[cfg(windows)]
-    std::process::Command::new("cmd")
-        .args(["/c", "start", "", &path.to_string_lossy()])
-        .spawn()?;
-
-    #[cfg(target_os = "macos")]
-    std::process::Command::new("open").arg(path).spawn()?;
-
-    #[cfg(target_os = "linux")]
-    std::process::Command::new("xdg-open").arg(path).spawn()?;
-
-    Ok(())
-}
-
-fn prompt_and_open(paths: &[PathBuf]) -> Result<()> {
-    println!(
-        "{}",
-        "Found more than 1 result! Pick one of the following:".yellow()
-    );
-    for (i, path) in paths.iter().enumerate() {
-        println!("  [{}] {}", i + 1, path.display());
-    }
-    print!("\nEnter number to open (or q to quit): ");
-    std::io::Write::flush(&mut std::io::stdout())?;
-
-    let mut input = String::new();
-    std::io::stdin().read_line(&mut input)?;
-    let input = input.trim();
-
-    if input == "q" || input == "Q" {
-        return Ok(());
-    }
-
-    match input.parse::<usize>() {
-        Ok(n) if n >= 1 && n <= paths.len() => {
-            open_file(&paths[n - 1])?;
-        }
-        _ => {
-            bail!("Invalid selection. Run ldx again to try.");
-        }
-    }
-
-    Ok(())
-}
+use search::get_all_drives;
 
 // ---------------------------------------------------------------------------
 // Main
@@ -420,7 +32,7 @@ fn main() -> Result<()> {
     }
 
     if args.contains("--version") {
-        println!("localdex v0.0.2");
+        println!("localdex v0.0.3");
         return Ok(());
     }
 
@@ -439,9 +51,21 @@ fn main() -> Result<()> {
     let verbose = args.contains(["-v", "--verbose"]);
     let first = args.contains(["-1", "--first"]);
     let open = args.contains(["-o", "--open"]);
-    let threads: usize = args
-        .opt_value_from_str(["-t", "--threads"])?
-        .unwrap_or_else(num_cpus::get);
+    let max_threads = num_cpus::get();
+    let threads: usize = {
+        let requested: Option<usize> = args.opt_value_from_str(["-t", "--threads"])?;
+        match requested {
+            Some(n) if n > max_threads => {
+                eprintln!(
+                    "Warning: {} threads requested but only {} logical cores available. Capping at {}.",
+                    n, max_threads, max_threads
+                );
+                max_threads
+            }
+            Some(n) => n,
+            None => max_threads,
+        }
+    };
     let limit: Option<usize> = args.opt_value_from_str(["-L", "--limit"])?;
 
     #[cfg(windows)]
