@@ -245,100 +245,169 @@ install_from_source() {
     # Generate config.toml
     CONFIG_FILE="$DEST/config.toml"
     cat > "$CONFIG_FILE" << 'CONFIGEOF'
-# ldx configuration file
-# Edit this file to customise flags and behaviour
+# ═══════════════════════════════════════════════════════════════════════════
+# ldx configuration file (v0.0.5+)
+# ═══════════════════════════════════════════════════════════════════════════
+# Edit this file to customize flags, create aliases, and define custom commands
 #
 # os values: "all", "windows", "linux", "macos"
+# action types: "set_boolean", "set_value"
+
+# ═══════════════════════════════════════════════════════════════════════════
+# Built-in flags (editable)
+# ═══════════════════════════════════════════════════════════════════════════
 
 [flags.all-files]
 short = "a"
 long = "all-files"
 description = "Count all files, no filter needed"
 os = "all"
+action = "set_boolean"
+target = "all"
 
 [flags.all-drives]
 short = "A"
 long = "all-drives"
 description = "Scan all drives with a per-drive breakdown and total"
 os = "windows"
-
-[flags.dir]
-short = "d"
-long = "dir"
-description = "Directory to search in (default: current)"
-os = "all"
-
-[flags.dirs]
-short = "D"
-long = "dirs"
-description = "Search for directories instead of files"
-os = "all"
-
-[flags.extension]
-short = "e"
-long = "extension"
-description = "Search by file extension (e.g. pdf, rs)"
-os = "all"
-
-[flags.where]
-short = "w"
-long = "where"
-description = "Print the path of the matched file or directory with a cd hint"
-os = "all"
-
-[flags.first]
-short = "1"
-long = "first"
-description = "Stop after the first match"
-os = "all"
-
-[flags.help]
-short = "h"
-long = "help"
-description = "Show this help message"
-os = "all"
-
-[flags.limit]
-short = "L"
-long = "limit"
-description = "Stop after N matches (e.g. -L 5)"
-os = "all"
-
-[flags.open]
-short = "o"
-long = "open"
-description = "Open or launch the matched file"
-os = "all"
-
-[flags.quiet]
-short = "q"
-long = "quiet"
-description = "Suppress per-file output; still prints summary count"
-os = "all"
+action = "set_boolean"
+target = "all_drives"
 
 [flags.case-sensitive]
 short = "s"
 long = "case-sensitive"
 description = "Case-sensitive search"
 os = "all"
+action = "set_boolean"
+target = "case_sensitive"
+
+[flags.dir]
+short = "d"
+long = "dir"
+description = "Directory to search in (default: current)"
+os = "all"
+action = "set_value"
+target = "dir"
+
+[flags.dirs]
+short = "D"
+long = "dirs"
+description = "Search for directories instead of files"
+os = "all"
+action = "set_boolean"
+target = "dirs_only"
+
+[flags.extension]
+short = "e"
+long = "extension"
+description = "Search by file extension (e.g. pdf, rs)"
+os = "all"
+action = "set_value"
+target = "extension"
+
+[flags.first]
+short = "1"
+long = "first"
+description = "Stop after the first match"
+os = "all"
+action = "set_boolean"
+target = "first"
+
+[flags.help]
+short = "h"
+long = "help"
+description = "Show this help message"
+os = "all"
+action = "show_help"
+
+[flags.limit]
+short = "L"
+long = "limit"
+description = "Stop after N matches (e.g. -L 5)"
+os = "all"
+action = "set_value"
+target = "limit"
+
+[flags.open]
+short = "o"
+long = "open"
+description = "Open or launch the matched file"
+os = "all"
+action = "set_boolean"
+target = "open"
+
+[flags.quiet]
+short = "q"
+long = "quiet"
+description = "Suppress per-file output; still prints summary count"
+os = "all"
+action = "set_boolean"
+target = "quiet"
 
 [flags.stats]
 short = "S"
 long = "stats"
 description = "Show scan statistics"
 os = "all"
+action = "set_boolean"
+target = "stats"
 
 [flags.threads]
 short = "t"
 long = "threads"
 description = "Number of threads to use (default: all available)"
 os = "all"
+action = "set_value"
+target = "threads"
 
 [flags.verbose]
 short = "v"
 long = "verbose"
 description = "Show detailed scan breakdown (files + dirs separately)"
 os = "all"
+action = "set_boolean"
+target = "verbose"
+
+[flags.where]
+short = "w"
+long = "where"
+description = "Print the path with cd hint (implies -1)"
+os = "all"
+action = "set_boolean"
+target = "where_mode"
+
+# ═══════════════════════════════════════════════════════════════════════════
+# Custom flags (user-defined shortcuts)
+# ═══════════════════════════════════════════════════════════════════════════
+# Uncomment examples below or add your own!
+
+# [custom.pdf]
+# short = "P"
+# long = "pdf"
+# description = "Search for PDF files"
+# os = "all"
+# action = "set_value"
+# target = "extension"
+# value = "pdf"
+
+# [custom.music]
+# short = "M"
+# long = "music"
+# description = "Search for music files"
+# os = "all"
+# action = "set_value"
+# target = "extension"
+# value = "mp3"
+
+# ═══════════════════════════════════════════════════════════════════════════
+# Aliases (expand to multiple flags)
+# ═══════════════════════════════════════════════════════════════════════════
+# Uncomment examples below or add your own!
+
+# [aliases]
+# docs = "-e pdf -e docx -e txt"
+# fast = "-t 16 -q"
+# home = "-d ~ -S"
 CONFIGEOF
 
     echo -e "${GREEN}✓ Generated config.toml${RESET}"

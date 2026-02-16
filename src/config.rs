@@ -7,18 +7,30 @@ use std::path::PathBuf;
 // Config file structures
 // ---------------------------------------------------------------------------
 
+#[allow(dead_code)]
 #[derive(Debug, Deserialize)]
 pub struct FlagDef {
     pub short: String,
     pub long: String,
     pub description: String,
     pub os: String,
+    #[serde(default)]
+    pub action: Option<String>, // "set_boolean", "set_value", etc.
+    #[serde(default)]
+    pub target: Option<String>, // Which internal variable to affect
+    #[serde(default)]
+    pub value: Option<String>, // Hardcoded value for custom flags
 }
 
+#[allow(dead_code)]
 #[derive(Debug, Deserialize)]
 pub struct LdxConfig {
     #[serde(default)]
     pub flags: HashMap<String, FlagDef>,
+    #[serde(default)]
+    pub custom: HashMap<String, FlagDef>,
+    #[serde(default)]
+    pub aliases: HashMap<String, String>,
 }
 
 pub fn load_config() -> Result<LdxConfig> {
