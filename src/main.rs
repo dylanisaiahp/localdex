@@ -1,133 +1,41 @@
 mod config;
 mod display;
+mod flags;
 mod launcher;
 mod search;
 
 use aho_corasick::{AhoCorasick, AhoCorasickBuilder};
-use anyhow::{Result, bail};
+use anyhow::Result;
 use dirs::home_dir;
-use pico_args::Arguments;
 use std::path::PathBuf;
 use std::time::Instant;
 
 use config::load_config;
 use display::{fmt_num, print_help};
+use flags::parse_args;
 use launcher::{open_file, prompt_and_open};
 use search::{Config, scan_dir};
 
 #[cfg(windows)]
 use search::get_all_drives;
 
-// ---------------------------------------------------------------------------
-// Main
-// ---------------------------------------------------------------------------
-
 fn main() -> Result<()> {
     let ldx_config = load_config()?;
-    let mut args = Arguments::from_env();
+    let f = parse_args(&ldx_config)?;
 
-    if args.contains(["-h", "--help"]) {
+    if f.show_help {
         print_help(&ldx_config);
         return Ok(());
     }
 
-    if args.contains("--version") {
-        println!("localdex v0.0.4");
+    if f.show_version {
+        println!("localdex v0.0.5");
         return Ok(());
     }
 
-    let extension: Option<String> = args
-        .opt_value_from_str(["-e", "--extension"])?
-        .map(|s: String| s.trim_start_matches('.').to_lowercase());
+    let mut dir = f.dir.clone();
 
-    let mut dir: PathBuf = args
-        .opt_value_from_str(["--dir", "-d"])?
-        .unwrap_or_else(|| ".".into());
-
-    let case_sensitive = args.contains(["-s", "--case-sensitive"]);
-    let quiet = args.contains(["-q", "--quiet"]);
-    let stats = args.contains(["-S", "--stats"]);
-    let all = args.contains(["-a", "--all-files"]);
-    let verbose = args.contains(["-v", "--verbose"]);
-    let first = args.contains(["-1", "--first"]);
-    let open = args.contains(["-o", "--open"]);
-    let dirs_only = args.contains(["-D", "--dirs"]);
-    let where_mode = args.contains(["-w", "--where"]);
-    let max_threads = num_cpus::get();
-    let threads: usize = {
-        let requested: Option<usize> = args.opt_value_from_str(["-t", "--threads"])?;
-        match requested {
-            Some(n) if n > max_threads => {
-                eprintln!(
-                    "Warning: {} threads requested but only {} logical cores available. Capping at {}.",
-                    n, max_threads, max_threads
-                );
-                max_threads
-            }
-            Some(n) => n,
-            None => max_threads,
-        }
-    };
-    let limit: Option<usize> = args.opt_value_from_str(["-L", "--limit"])?;
-
-    #[cfg(windows)]
-    let all_drives = args.contains(["-A", "--all-drives"]);
-    #[cfg(not(windows))]
-    let all_drives = false;
-
-    if first && limit.is_some() {
-        bail!("-1/--first and -L/--limit cannot be used together. Run with --help for usage.");
-    }
-
-    let limit = if first || where_mode { Some(1) } else { limit };
-
-    let pattern_opt: Option<String> = args.opt_free_from_str()?;
-
-    let remaining = args.finish();
-    if !remaining.is_empty() {
-        bail!(
-            "Unexpected args: {:?}. Run with --help for usage.",
-            remaining
-        );
-    }
-
-    if let Some(ref p) = pattern_opt
-        && p.starts_with('-')
-    {
-        bail!("Unexpected arg: {:?}. Run with --help for usage.", p);
-    }
-
-    if all && (pattern_opt.is_some() || extension.is_some()) {
-        bail!(
-            "-a/--all-files cannot be combined with a pattern or -e/--extension. Run with --help for usage."
-        );
-    }
-
-    if open && all {
-        bail!("-o/--open cannot be combined with -a/--all-files. Run with --help for usage.");
-    }
-
-    if dirs_only && all {
-        bail!("-D/--dirs cannot be combined with -a/--all-files. Run with --help for usage.");
-    }
-
-    if dirs_only && extension.is_some() {
-        bail!("-D/--dirs cannot be combined with -e/--extension. Run with --help for usage.");
-    }
-
-    if pattern_opt.is_some() && extension.is_some() {
-        bail!(
-            "Cannot use both a pattern and -e/--extension at the same time. Run with --help for usage."
-        );
-    }
-
-    if !all && pattern_opt.is_none() && extension.is_none() {
-        bail!(
-            "Either a pattern, -e/--extension, or -a/--all-files is required. Run with --help for usage."
-        );
-    }
-
-    if !all_drives {
+    if !f.all_drives {
         if dir.starts_with("~") {
             if let Some(mut home) = home_dir() {
                 let rest = dir.strip_prefix("~").unwrap();
@@ -162,13 +70,13 @@ fn main() -> Result<()> {
             }
         };
 
-        if !quiet {
+        if !f.quiet {
             println!("Searching in: {}", dir.display());
         }
 
-        let matcher: Option<AhoCorasick> = if !all && extension.is_none() {
-            let pattern = pattern_opt.unwrap();
-            Some(if case_sensitive {
+        let matcher: Option<AhoCorasick> = if !f.all && f.extension.is_none() {
+            let pattern = f.pattern.clone().unwrap();
+            Some(if f.case_sensitive {
                 AhoCorasick::new([&pattern])?
             } else {
                 AhoCorasickBuilder::new()
@@ -180,28 +88,28 @@ fn main() -> Result<()> {
         };
 
         let config = Config {
-            case_sensitive,
-            quiet,
-            all,
-            dirs_only,
-            extension,
+            case_sensitive: f.case_sensitive,
+            quiet:          f.quiet,
+            all:            f.all,
+            dirs_only:      f.dirs_only,
+            extension:      f.extension.clone(),
             matcher,
-            limit,
-            threads,
-            collect_paths: open || where_mode,
+            limit:          f.limit,
+            threads:        f.threads,
+            collect_paths:  f.open || f.where_mode,
         };
 
         let result = scan_dir(&dir, &config);
         let tc = result.files + result.dirs;
 
-        if all {
+        if f.all {
             println!(
                 "Found {} file{} in {:.3}s",
                 fmt_num(result.matches),
                 if result.matches == 1 { "" } else { "s" },
                 result.duration.as_secs_f64()
             );
-        } else if dirs_only {
+        } else if f.dirs_only {
             println!(
                 "Found {} matching director{} in {:.3}s",
                 fmt_num(result.matches),
@@ -217,23 +125,23 @@ fn main() -> Result<()> {
             );
         }
 
-        if stats && result.duration.as_secs_f64() > 0.0 {
+        if f.stats && result.duration.as_secs_f64() > 0.0 {
             let s = result.duration.as_secs_f64();
-            if verbose {
+            if f.verbose {
                 println!(
                     "Scanned {} entries ({} files + {} dirs) | Speed: {} entries/s | Threads: {}",
                     fmt_num(tc),
                     fmt_num(result.files),
                     fmt_num(result.dirs),
                     fmt_num((tc as f64 / s) as usize),
-                    threads
+                    f.threads
                 );
             } else {
                 println!(
                     "Scanned {} entries | {} entries/s | Threads: {}",
                     fmt_num(tc),
                     fmt_num((tc as f64 / s) as usize),
-                    threads
+                    f.threads
                 );
             }
         }
@@ -242,7 +150,7 @@ fn main() -> Result<()> {
             std::process::exit(1);
         }
 
-        if open {
+        if f.open {
             match result.paths.len() {
                 0 => {}
                 1 => open_file(&result.paths[0])?,
@@ -250,12 +158,12 @@ fn main() -> Result<()> {
             }
         }
 
-        if where_mode {
+        if f.where_mode {
             match result.paths.len() {
                 0 => {}
                 1 => {
                     let path = &result.paths[0];
-                    let dir_path = if dirs_only {
+                    let dir_path = if f.dirs_only {
                         path.to_string_lossy().into_owned()
                     } else {
                         path.parent()
@@ -270,14 +178,13 @@ fn main() -> Result<()> {
             }
         }
     } else {
-        // -A / --all-drives
         #[cfg(windows)]
         {
             let drives = get_all_drives();
 
-            let matcher: Option<AhoCorasick> = if !all && extension.is_none() {
-                let pattern = pattern_opt.unwrap();
-                Some(if case_sensitive {
+            let matcher: Option<AhoCorasick> = if !f.all && f.extension.is_none() {
+                let pattern = f.pattern.clone().unwrap();
+                Some(if f.case_sensitive {
                     AhoCorasick::new([&pattern])?
                 } else {
                     AhoCorasickBuilder::new()
@@ -289,15 +196,15 @@ fn main() -> Result<()> {
             };
 
             let config = Config {
-                case_sensitive,
-                quiet,
-                all,
-                dirs_only,
-                extension,
+                case_sensitive: f.case_sensitive,
+                quiet:          f.quiet,
+                all:            f.all,
+                dirs_only:      f.dirs_only,
+                extension:      f.extension.clone(),
                 matcher,
-                limit,
-                threads,
-                collect_paths: open,
+                limit:          f.limit,
+                threads:        f.threads,
+                collect_paths:  f.open,
             };
 
             let total_start = Instant::now();
@@ -306,7 +213,7 @@ fn main() -> Result<()> {
             let mut total_dirs = 0usize;
 
             for drive in &drives {
-                if !quiet {
+                if !f.quiet {
                     println!("Searching in: {}", drive.display());
                 }
 
@@ -317,7 +224,7 @@ fn main() -> Result<()> {
                 total_files += result.files;
                 total_dirs += result.dirs;
 
-                if all {
+                if f.all {
                     println!(
                         "  Found {} file{} in {:.3}s",
                         fmt_num(result.matches),
@@ -333,9 +240,9 @@ fn main() -> Result<()> {
                     );
                 }
 
-                if stats && result.duration.as_secs_f64() > 0.0 {
+                if f.stats && result.duration.as_secs_f64() > 0.0 {
                     let s = result.duration.as_secs_f64();
-                    if verbose {
+                    if f.verbose {
                         println!(
                             "  Scanned {} entries ({} files + {} dirs) | Speed: {} entries/s",
                             fmt_num(tc),
@@ -357,7 +264,7 @@ fn main() -> Result<()> {
             let total_tc = total_files + total_dirs;
 
             println!();
-            if all {
+            if f.all {
                 println!(
                     "Total: {} file{} across {} drive{} in {:.3}s",
                     fmt_num(total_matches),
@@ -377,23 +284,23 @@ fn main() -> Result<()> {
                 );
             }
 
-            if stats && total_dur.as_secs_f64() > 0.0 {
+            if f.stats && total_dur.as_secs_f64() > 0.0 {
                 let s = total_dur.as_secs_f64();
-                if verbose {
+                if f.verbose {
                     println!(
                         "Scanned {} entries ({} files + {} dirs) | Speed: {} entries/s | Threads: {}",
                         fmt_num(total_tc),
                         fmt_num(total_files),
                         fmt_num(total_dirs),
                         fmt_num((total_tc as f64 / s) as usize),
-                        threads
+                        f.threads
                     );
                 } else {
                     println!(
                         "Scanned {} entries | {} entries/s | Threads: {}",
                         fmt_num(total_tc),
                         fmt_num((total_tc as f64 / s) as usize),
-                        threads
+                        f.threads
                     );
                 }
             }
