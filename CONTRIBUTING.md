@@ -17,13 +17,13 @@ Thanks for your interest in contributing! ldx is a fast, parallel file search CL
 ```bash
 git clone https://github.com/dylanisaiahp/localdex
 cd localdex
-./build.sh
+./scripts/build.sh
 ```
 
 Or install directly:
 
 ```bash
-./install.sh
+./scripts/install.sh
 ```
 
 See [README.md](README.md) for full installation instructions.
@@ -34,10 +34,10 @@ See [README.md](README.md) for full installation instructions.
 
 ```bash
 # Build in debug mode
-./build.sh --debug
+./scripts/build.sh --debug
 
 # Build in release mode
-./build.sh --release
+./scripts/build.sh --release
 
 # Run clippy before submitting
 cargo clippy
@@ -56,10 +56,10 @@ If you'd like to contribute benchmark results from your hardware, run:
 
 ```bash
 # Warm cache (run anytime)
-./benchmark.sh --runs 20 --warm
+./scripts/benchmark.sh --runs 20 --warm
 
 # Cold cache (run immediately after reboot, before anything else)
-./benchmark.sh --runs 20 --cold
+./scripts/benchmark.sh --runs 20 --cold
 ```
 
 Then open an issue or PR with your CSV files attached. Please include your hardware specs (CPU, RAM, storage type). Results are stored in `/benchmarks` and credited in the README.
@@ -70,11 +70,7 @@ Then open an issue or PR with your CSV files attached. Please include your hardw
 
 Check the [README roadmap](README.md#roadmap) before starting work to avoid duplicating planned features. If you want to work on something not listed, open an issue first to discuss it.
 
-### v0.0.3 priorities
-- Split `main.rs` into multiple source files (`config.rs`, `scan.rs`, `output.rs`, `open.rs`)
-- `-g/--goto` — navigate to matched file's directory
-- Config-based scripting and user-defined aliases
-- Improved benchmark tooling (`X/N` progress counter, auto hardware detection)
+Current focus is **v0.1.0 Beta** — code audit, unit tests, and Linux benchmarks. See the roadmap in README.md for details.
 
 ---
 

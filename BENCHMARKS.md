@@ -137,6 +137,64 @@ HDD and external drive performance varies significantly based on drive age, frag
 
 ---
 
-## 🐧 Linux / macOS Benchmarks
+## 🐧 Linux Benchmarks — CachyOS (Ryzen 7 5825U, NVMe SSD)
 
-*Coming soon — contributions welcome! If you run ldx on Linux or macOS, please open an issue with your benchmark results.*
+| Component | Spec |
+|-----------|------|
+| **CPU** | AMD Ryzen 7 5825U (8 cores / 16 threads, mobile) |
+| **RAM** | 16GB |
+| **Storage** | NVMe SSD (475GB) |
+| **OS** | CachyOS (Linux, BORE scheduler) |
+
+> All benchmarks are **10 warm runs** per configuration.
+
+---
+
+### 🧵 Thread Scaling — `/home/dylan` (106k entries, NVMe)
+
+| Threads | Warm Avg | Warm Median | Efficiency |
+|---------|----------|-------------|------------|
+| 1 | 999,432/s | 1,000,164/s | 100% |
+| 2 | 1,812,474/s | 1,813,606/s | 91% |
+| 4 | 3,334,043/s | 3,334,091/s | 83% |
+| 6 | 4,130,872/s | 4,057,115/s | 68% |
+| 8 | 5,000,375/s | 4,981,887/s | 62% |
+| 10 | 5,260,197/s | 5,355,170/s | 54% |
+| 12 | 5,593,996/s | 5,715,085/s | 48% |
+| 14 | 5,658,490/s | 5,718,812/s | 41% |
+| **16** | **5,902,959/s** | **6,026,774/s** | 38% ✅ |
+
+---
+
+### 🧵 Thread Scaling — `/usr` (NVMe)
+
+| Threads | Warm Avg | Warm Median |
+|---------|----------|-------------|
+| 1 | 1,200,595/s | 1,203,551/s |
+| 4 | 3,828,810/s | 3,857,702/s |
+| 8 | 5,566,237/s | 5,494,850/s |
+| 12 | 5,784,335/s | 5,771,879/s |
+| **16** | **6,274,455/s** | **6,211,923/s** ✅ |
+
+> **Peak recorded: 7,065,858 entries/s** @ 16t on `/usr` (single run max)
+
+---
+
+### ⚡ Linux vs Windows Comparison
+
+| Metric | Windows (i5-13400F) | Linux (Ryzen 7 5825U) | Ratio |
+|--------|--------------------|-----------------------|-------|
+| Peak speed | 1,641,700/s | 7,065,858/s | **4.3x** |
+| 16t sustained (home dir) | ~685,000/s | 6,026,774/s | **8.8x** |
+| Single thread | ~148,000/s | 1,000,164/s | **6.8x** |
+| Cold cache (full drive) | ~94,000/s | 5,272,431/s | **56x** |
+
+> Linux cold cache is faster than Windows warm cache. The Windows gap is almost entirely the filesystem stack (NTFS + Defender), not the CPU.
+
+> These numbers are from a **mobile** Ryzen 7. Desktop CachyOS benchmarks pending.
+
+---
+
+## 🍎 macOS Benchmarks
+
+*Contributions welcome! If you run ldx on macOS, please open an issue with your benchmark results.*

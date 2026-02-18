@@ -29,7 +29,14 @@ pub fn print_help(config: &LdxConfig) {
         "ldx".bright_cyan().bold(),
         "blazing-fast parallel file search".dimmed()
     );
-    println!("  {}", "v0.0.7 · github.com/dylanisaiahp/localdex".dimmed());
+    println!(
+        "  {}",
+        format!(
+            "v{} · github.com/dylanisaiahp/localdex",
+            env!("CARGO_PKG_VERSION")
+        )
+        .dimmed()
+    );
     println!();
 
     // ── Usage ─────────────────────────────────────────────────────────────────

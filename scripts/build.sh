@@ -63,7 +63,7 @@ done
 
 # ─── Header ───────────────────────────────────────────────────────────────────
 echo ""
-echo -e "${CYAN}${BOLD}🔍 ldx — Build Script (v0.0.7)${RESET}"
+echo -e "${CYAN}${BOLD}🔍 ldx — Build Script${RESET}"
 echo -e "${CYAN}OS: $OS | Mode: $BUILD_MODE${RESET}"
 echo ""
 

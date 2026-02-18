@@ -31,7 +31,7 @@ fn main() -> Result<()> {
     }
 
     if f.show_version {
-        println!("localdex v0.0.7");
+        println!("localdex v{}", env!("CARGO_PKG_VERSION"));
         return Ok(());
     }
 
