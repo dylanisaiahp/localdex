@@ -4,7 +4,7 @@
 
 **A blazing-fast file search CLI for Windows, Linux, and macOS**
 
-[![Version](https://img.shields.io/badge/version-0.0.7-blue.svg)](https://github.com/dylanisaiahp/localdex)
+[![Version](https://img.shields.io/badge/version-0.0.8-blue.svg)](https://github.com/dylanisaiahp/localdex)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![Built with Rust](https://img.shields.io/badge/built%20with-Rust-orange.svg)](https://www.rust-lang.org/)
 [![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20Linux%20%7C%20macOS-lightgrey.svg)](https://github.com/dylanisaiahp/localdex)
@@ -186,16 +186,19 @@ Linux and macOS benchmark results are especially valuable — open an issue or P
 - `-L` limit race condition fixed
 - Version sourced from `Cargo.toml`
 
-### v0.0.8 (next)
-- README and docs updated to v0.0.7
-- Full flag test pass (Windows + Linux)
-- `bump.sh` version helper
-- Clean release commit + tag
+### v0.0.8 ✓ Shipped
+- README and docs updated to v0.0.7 feature set
+- Windows flag test pass — all flags and aliases verified
+- `bump.sh` version helper script
+- Scripts moved to `scripts/` directory
+- Linux test pass deferred to v0.1.0
 
-### v0.1.0 (beta)
-- Codebase audit — cut bloat, improve clarity
-- Unit tests for edge cases
-- Full Linux and macOS benchmark data
+### v0.1.0 Beta (next)
+- Code audit — `flags.rs`, `main.rs`, `search.rs` cleanup
+- Extract shared scan logic (eliminate all-drives duplication in `main.rs`)
+- Unit tests for flag conflicts, alias expansion, limit behavior
+- Linux bare-metal benchmarks (CachyOS)
+- Full cross-platform flag test pass
 
 ### Future
 - Pre-built binaries for Windows, Linux, and macOS

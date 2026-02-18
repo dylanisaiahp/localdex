@@ -1,7 +1,7 @@
 # Project Vision: parex / prx / parallax
 
 **Last Updated:** 2026-02-18  
-**Current Version:** v0.0.7 (localdex, pre-rename) — **shipped** ✓
+**Current Version:** v0.0.8 (localdex, pre-rename) — in progress
 
 ---
 
@@ -70,7 +70,7 @@ The `r` prefix signals "production-ready." Year-based versioning was considered 
 
 ---
 
-## Current State (v0.0.7) ✓ Shipped
+## Current State (v0.0.8)
 
 **Performance:**
 - Peak: 1,641,700 entries/s @ 16t on 86k files
@@ -139,19 +139,24 @@ Accessibility. CSS themes need zero code. Python/JS covers most devs. Rust for p
 - `-L` limit race condition fix
 - Version from `env!("CARGO_PKG_VERSION")`
 
-### v0.0.8 (Next — Docs & Testing Polish)
-- Update README.md to reflect v0.0.7 features
-- Thorough test pass of all flags + aliases (Windows + Linux)
-- `cargo clippy --fix` + `cargo fmt` clean pass
-- `bump.sh` version helper script
-- Clean commit + tag + push
+### v0.0.8 ✓ Shipped (Docs & Testing Polish)
+- README.md updated to v0.0.7 feature set ✓
+- Windows flag test pass — all flags and aliases verified ✓
+- `cargo clippy` + `cargo fmt` clean ✓
+- `bump.sh` version helper script ✓
+- Scripts moved to `scripts/` directory ✓
+- Linux test pass — deferred to v0.1.0 backlog (no Linux machine available)
 
-### v0.1.0 Beta (Pre-Separation)
+### v0.1.0 Beta (Next — Pre-Separation)
 - Code audit: cut bloat, improve clarity
-- Unit tests for edge cases
-- Full Linux benchmarks (CachyOS bare metal)
-- cargo clippy zero warnings maintained
-- Thorough cross-platform testing of all flags
+  - `flags.rs` — simplify parse_args, reduce duplication
+  - `main.rs` — extract shared single/multi-drive scan logic
+  - `search.rs` — consolidate duplicate match+limit blocks into shared helper
+  - `config.rs`, `display.rs` — already clean, minor polish only
+- Unit tests for core edge cases (flag conflicts, alias expansion, limit behavior)
+- Linux bare-metal benchmarks (CachyOS) — carried from v0.0.8 backlog
+- `cargo clippy` zero warnings maintained throughout
+- Full cross-platform flag test pass (Windows + Linux)
 
 ### Engine Separation Milestone
 1. Create `parex` repo → extract core, design Query API
@@ -260,12 +265,19 @@ Solid for v0.0.X experimental with zero promotion. Post to r/rust after r1.0 sta
 - Dynamic `--help` showing aliases cleanly
 - `env!("CARGO_PKG_VERSION")` — Cargo.toml is now single source of truth for version
 
-**Next session priorities (v0.0.8):**
-1. Update README.md to v0.0.7 feature set
-2. Build and test `bump.sh`
-3. Full flag test pass on Linux
-4. Ship v0.0.8 (docs/testing polish)
-5. Begin v0.1.0 code audit planning
+**Completed in v0.0.8:**
+- README, vision, and scripts all updated
+- `bump.sh` built, tested, and working
+- Windows flag test pass clean
+- Scripts moved to `scripts/` directory
+- Linux test pass deferred to v0.1.0 (no machine available)
+
+**Next session priorities (v0.1.0 Beta):**
+1. Code audit — start with `flags.rs` and `main.rs`
+2. Extract shared scan logic from `main.rs` all-drives duplication
+3. Unit tests — flag conflict validation, alias expansion, limit clamping
+4. Linux bare-metal benchmarks when CachyOS machine available
+5. Begin engine separation planning (parex Query API design)
 
 ---
 
