@@ -1,7 +1,7 @@
 # Project Vision: parex / prx / parallax
 
 **Last Updated:** 2026-02-18  
-**Current Version:** v0.0.6 (localdex, pre-rename)
+**Current Version:** v0.0.7 (localdex, pre-rename) — **shipped** ✓
 
 ---
 
@@ -22,12 +22,14 @@ Build a blazing-fast parallel search framework (parex) with clean CLI (prx) and 
 ### prx (CLI)
 - **What:** File search wrapper around parex
 - **Binary name:** `ldx` (transitional), then `prx`
+- **Note:** No crate conflict on crates.io, but a CLI called PROJAX uses the `prx` command — verify before final rename or keep `ldx` as the permanent binary name
 - **Philosophy:** Config-driven everything, zero hardcoded behavior
 - **Launch:** v0.5.0 after rename from localdex
 
 ### parallax (GUI)
 - **What:** Spotlight/Raycast style desktop app (Tauri + Rust)
 - **UX:** Borderless, dynamic height, real-time streaming results (NO loading spinners)
+- **UX note:** Consider a ~50ms debounce/throttle on first keystrokes when cold to avoid flicker on slow drives
 - **Scope:** $HOME by default (not full drives—speed over completeness)
 - **Plugins:** 5-tier system (CSS themes → Lua → JS → Python/compiled → Rust)
 - **Launch:** After parex/prx stable
@@ -38,7 +40,7 @@ Build a blazing-fast parallel search framework (parex) with clean CLI (prx) and 
 
 ### Enscribe (distant future)
 - **What:** Cross-platform notes app for scripture/prayers/journaling
-- **Status:** Standalone passion project, optional Parallax integration
+- **Status:** Standalone passion project, optional Parallax integration (keep optional)
 
 ---
 
@@ -47,7 +49,7 @@ Build a blazing-fast parallel search framework (parex) with clean CLI (prx) and 
 **Why rename?** "localdex" no longer fits—it's not just local files anymore.
 
 - **parex** = parallel executor/explorer (available on crates.io ✓)
-- **prx** = CLI wrapper (short, punchy)
+- **prx** = CLI wrapper (short, punchy) — verify no `prx` command conflict first
 - **parallax** = GUI (sleek, visual metaphor for depth perception)
 
 **Timing:** Rename during engine separation milestone, not before.
@@ -68,7 +70,7 @@ The `r` prefix signals "production-ready." Year-based versioning was considered 
 
 ---
 
-## Current State (v0.0.6)
+## Current State (v0.0.7) ✓ Shipped
 
 **Performance:**
 - Peak: 1,641,700 entries/s @ 16t on 86k files
@@ -79,17 +81,23 @@ The `r` prefix signals "production-ready." Year-based versioning was considered 
 - Config-driven flag parsing (users can remap any flag)
 - Aliases (e.g., `repo = "localdex -D -d D: -1 -S -w -q"`)
 - Custom flags (e.g., `-P` → auto-expand to `-e pdf`)
-- Management flags: `--config`, `--edit`, `--exclude`
+- Management flags: `--config`, `--edit`, `--exclude`, `--check`, `--sync`, `--reset`
+- Dynamic `--help` showing user's aliases and custom flags
+- Version sourced from `Cargo.toml` via `env!("CARGO_PKG_VERSION")`
+- `-L` limit race condition fixed (clamped reported count, early-exit guard)
 - Cross-platform installer/uninstaller with source cleanup options
 - Modular codebase: config.rs, flags.rs, search.rs, display.rs, launcher.rs, main.rs
 
 **What works:**
-- File and directory search with substring/extension/regex matching
+- File and directory search with substring/extension matching
 - Multi-drive scanning (Windows)
 - Thread scaling with auto-cap at logical cores
 - Real-time result streaming with `-1`/`-L` limits
 - `-w/--where` with cd hints
 - `-o/--open` with picker for multiple results
+- `--check` validates config, catches duplicate flags and missing targets
+- `--sync` adds missing default flags without touching user aliases/custom flags
+- `--reset` restores default flags, preserves `[aliases]`, `[custom]`, `[meta]`
 
 ---
 
@@ -122,18 +130,28 @@ Accessibility. CSS themes need zero code. Python/JS covers most devs. Rust for p
 
 ## Roadmap
 
-### v0.0.7 (Next)
+### v0.0.7 ✓ Shipped
 - `--check` (validate config, print summary)
 - `--sync` (merge new default flags without overwriting user customizations)
-- `--reset` (factory reset config)
-- Dynamic `--help` showing user's custom aliases/flags
+- `--reset` (factory reset config, preserve aliases/custom)
+- Dynamic `--help` showing user's aliases/custom flags
+- Nicer help layout (Management section, Tips, column-aligned flags)
+- `-L` limit race condition fix
+- Version from `env!("CARGO_PKG_VERSION")`
+
+### v0.0.8 (Next — Docs & Testing Polish)
+- Update README.md to reflect v0.0.7 features
+- Thorough test pass of all flags + aliases (Windows + Linux)
+- `cargo clippy --fix` + `cargo fmt` clean pass
+- `bump.sh` version helper script
+- Clean commit + tag + push
 
 ### v0.1.0 Beta (Pre-Separation)
 - Code audit: cut bloat, improve clarity
 - Unit tests for edge cases
 - Full Linux benchmarks (CachyOS bare metal)
 - cargo clippy zero warnings maintained
-- Thorough testing of all flags
+- Thorough cross-platform testing of all flags
 
 ### Engine Separation Milestone
 1. Create `parex` repo → extract core, design Query API
@@ -200,9 +218,6 @@ Unnecessary. parex already does universal parallel search. One tool, any data so
 ### `--goto` flag?
 Shell limitation. Child process can't `cd` the parent. Use `-w/--where` + manual cd instead.
 
-### Browser storage in artifacts (localStorage)?
-Not supported in claude.ai environment. Use in-memory state or suggest external hosting.
-
 ### Year-based versioning (v26.X)?
 Too complex, minimal benefit. Clean semantic versioning is simpler and familiar.
 
@@ -230,26 +245,27 @@ Solid for v0.0.X experimental with zero promotion. Post to r/rust after r1.0 sta
 
 ## Current Challenges
 
-- **Message limits:** Hitting token caps during long sessions (considering alternatives)
-- **Testing rigor:** Need comprehensive flag testing before each release (v0.0.5 shipped with broken `--help`)
+- **Testing rigor:** Need comprehensive flag testing before each release (v0.0.5 shipped with broken `--help`, v0.0.7 caught `-L` race condition in testing)
 - **Documentation debt:** Need parex API docs, plugin dev guides, theme creation tutorials
+- **prx name conflict:** Verify PROJAX's `prx` command collision before final rename
 
 ---
 
 ## Session Notes
 
-**What works amazingly:**
-- Aliases (`repo`, `ct`, `pl` tested and working perfectly)
-- `--config` and `--edit` cross-platform
-- `--exclude` skipping target/node_modules correctly
-- Config-driven everything means users have total control
+**What works amazingly (v0.0.7):**
+- All three management commands (`--check`, `--sync`, `--reset`) tested and working
+- `--sync` duplicate-key bug caught and fixed in testing (key-name check added)
+- `-L` limit race condition identified and fixed before shipping
+- Dynamic `--help` showing aliases cleanly
+- `env!("CARGO_PKG_VERSION")` — Cargo.toml is now single source of truth for version
 
-**Next session priorities:**
-1. Test all flags thoroughly
-2. Add `--check`, `--sync`, `--reset`
-3. Make `--help` dynamic (show user's aliases/custom flags)
-4. Ship v0.0.6 cleanly
-5. Begin engine separation planning
+**Next session priorities (v0.0.8):**
+1. Update README.md to v0.0.7 feature set
+2. Build and test `bump.sh`
+3. Full flag test pass on Linux
+4. Ship v0.0.8 (docs/testing polish)
+5. Begin v0.1.0 code audit planning
 
 ---
 
