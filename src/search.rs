@@ -92,7 +92,10 @@ pub fn scan_dir(dir: &PathBuf, config: &Config) -> ScanResult {
 
                 // Check if this directory should be excluded
                 let dir_name = entry.file_name().to_string_lossy();
-                if excluded_dirs.iter().any(|ex| dir_name.as_ref() == ex.as_str()) {
+                if excluded_dirs
+                    .iter()
+                    .any(|ex| dir_name.as_ref() == ex.as_str())
+                {
                     return WalkState::Skip;
                 }
 
@@ -112,8 +115,14 @@ pub fn scan_dir(dir: &PathBuf, config: &Config) -> ScanResult {
                     if matched {
                         let mc = matches.fetch_add(1, Ordering::Relaxed) + 1;
 
-                        if collect_paths
-                            && let Ok(mut p) = paths.lock() {
+                        // Quit immediately if we've exceeded the limit — don't print or collect
+                        if let Some(lim) = limit
+                            && mc > lim
+                        {
+                            return WalkState::Quit;
+                        }
+
+                        if collect_paths && let Ok(mut p) = paths.lock() {
                             p.push(entry.path().to_path_buf());
                         }
 
@@ -128,7 +137,8 @@ pub fn scan_dir(dir: &PathBuf, config: &Config) -> ScanResult {
                         }
 
                         if let Some(lim) = limit
-                            && mc >= lim {
+                            && mc >= lim
+                        {
                             return WalkState::Quit;
                         }
                     }
@@ -167,8 +177,14 @@ pub fn scan_dir(dir: &PathBuf, config: &Config) -> ScanResult {
             if matched {
                 let mc = matches.fetch_add(1, Ordering::Relaxed) + 1;
 
-                if collect_paths
-                    && let Ok(mut p) = paths.lock() {
+                // Quit immediately if we've exceeded the limit — don't print or collect
+                if let Some(lim) = limit
+                    && mc > lim
+                {
+                    return WalkState::Quit;
+                }
+
+                if collect_paths && let Ok(mut p) = paths.lock() {
                     p.push(entry.path().to_path_buf());
                 }
 
@@ -183,7 +199,8 @@ pub fn scan_dir(dir: &PathBuf, config: &Config) -> ScanResult {
                 }
 
                 if let Some(lim) = limit
-                    && mc >= lim {
+                    && mc >= lim
+                {
                     return WalkState::Quit;
                 }
             }

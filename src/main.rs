@@ -10,7 +10,7 @@ use dirs::home_dir;
 use std::path::PathBuf;
 use std::time::Instant;
 
-use config::load_config;
+use config::{check_config, config_path, load_config, reset_config, sync_config};
 use display::{fmt_num, print_help};
 use flags::parse_args;
 use launcher::{open_file, prompt_and_open};
@@ -21,15 +21,9 @@ use search::get_all_drives;
 
 fn main() -> Result<()> {
     let ldx_config = load_config()?;
-
-    // Get config path for --config and --edit flags
-    let config_path = std::env::current_exe()
-        .unwrap_or_else(|_| PathBuf::from("."))
-        .parent()
-        .unwrap_or_else(|| std::path::Path::new("."))
-        .join("config.toml");
-
     let f = parse_args(&ldx_config)?;
+
+    // ── Management flags ──────────────────────────────────────────────────────
 
     if f.show_help {
         print_help(&ldx_config);
@@ -37,35 +31,49 @@ fn main() -> Result<()> {
     }
 
     if f.show_version {
-        println!("localdex v0.0.6");
+        println!("localdex v0.0.7");
         return Ok(());
     }
 
     if f.show_config {
-        println!("Config: {}", config_path.display());
+        println!("Config: {}", config_path().display());
         return Ok(());
     }
 
     if f.edit_config {
-        println!("Opening config: {}", config_path.display());
+        let path = config_path();
+        println!("Opening config: {}", path.display());
 
         #[cfg(windows)]
         std::process::Command::new("cmd")
-            .args(["/c", "start", "", &config_path.to_string_lossy()])
+            .args(["/c", "start", "", &path.to_string_lossy()])
             .spawn()?;
 
         #[cfg(target_os = "macos")]
-        std::process::Command::new("open")
-            .arg(&config_path)
-            .spawn()?;
+        std::process::Command::new("open").arg(&path).spawn()?;
 
         #[cfg(target_os = "linux")]
-        std::process::Command::new("xdg-open")
-            .arg(&config_path)
-            .spawn()?;
+        std::process::Command::new("xdg-open").arg(&path).spawn()?;
 
         return Ok(());
     }
+
+    if f.check_config {
+        check_config(&ldx_config);
+        return Ok(());
+    }
+
+    if f.sync_config {
+        sync_config()?;
+        return Ok(());
+    }
+
+    if f.reset_config {
+        reset_config()?;
+        return Ok(());
+    }
+
+    // ── Search ────────────────────────────────────────────────────────────────
 
     let mut dir = f.dir.clone();
 
@@ -136,26 +144,32 @@ fn main() -> Result<()> {
 
         let result = scan_dir(&dir, &config);
         let tc = result.files + result.dirs;
+        // Clamp reported matches to limit — the atomic counter can overshoot by a
+        // few in a parallel walk before WalkState::Quit propagates to all threads.
+        let reported_matches = match f.limit {
+            Some(lim) => result.matches.min(lim),
+            None => result.matches,
+        };
 
         if f.all {
             println!(
                 "Found {} file{} in {:.3}s",
-                fmt_num(result.matches),
-                if result.matches == 1 { "" } else { "s" },
+                fmt_num(reported_matches),
+                if reported_matches == 1 { "" } else { "s" },
                 result.duration.as_secs_f64()
             );
         } else if f.dirs_only {
             println!(
                 "Found {} matching director{} in {:.3}s",
-                fmt_num(result.matches),
-                if result.matches == 1 { "y" } else { "ies" },
+                fmt_num(reported_matches),
+                if reported_matches == 1 { "y" } else { "ies" },
                 result.duration.as_secs_f64()
             );
         } else {
             println!(
                 "Found {} matching file{} in {:.3}s",
-                fmt_num(result.matches),
-                if result.matches == 1 { "" } else { "s" },
+                fmt_num(reported_matches),
+                if reported_matches == 1 { "" } else { "s" },
                 result.duration.as_secs_f64()
             );
         }
@@ -181,7 +195,7 @@ fn main() -> Result<()> {
             }
         }
 
-        if result.matches == 0 {
+        if reported_matches == 0 {
             std::process::exit(1);
         }
 
@@ -207,9 +221,7 @@ fn main() -> Result<()> {
                     };
                     println!("  → cd {}", dir_path);
                 }
-                _ => {
-                    println!("  → Multiple results found, use -1 to get a single match");
-                }
+                _ => println!("  → Multiple results found, use -1 to get a single match"),
             }
         }
     } else {
@@ -284,13 +296,13 @@ fn main() -> Result<()> {
                             fmt_num(tc),
                             fmt_num(result.files),
                             fmt_num(result.dirs),
-                            fmt_num((tc as f64 / s) as usize),
+                            fmt_num((tc as f64 / s) as usize)
                         );
                     } else {
                         println!(
                             "  Scanned {} entries | {} entries/s",
                             fmt_num(tc),
-                            fmt_num((tc as f64 / s) as usize),
+                            fmt_num((tc as f64 / s) as usize)
                         );
                     }
                 }

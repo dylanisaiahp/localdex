@@ -4,7 +4,7 @@ use std::path::PathBuf;
 use crate::config::LdxConfig;
 
 // ---------------------------------------------------------------------------
-// Parsed flags — result of parsing all args
+// Parsed flags
 // ---------------------------------------------------------------------------
 
 pub struct ParsedFlags {
@@ -27,6 +27,9 @@ pub struct ParsedFlags {
     pub show_version: bool,
     pub show_config: bool,
     pub edit_config: bool,
+    pub check_config: bool,
+    pub sync_config: bool,
+    pub reset_config: bool,
 }
 
 // ---------------------------------------------------------------------------
@@ -35,11 +38,8 @@ pub struct ParsedFlags {
 
 pub fn expand_aliases(args: Vec<String>, config: &LdxConfig) -> Vec<String> {
     let mut expanded = Vec::new();
-
     for arg in args {
-        // Check if this arg matches an alias key
         if let Some(alias_value) = config.aliases.get(&arg) {
-            // Split alias value into individual args and append
             for part in alias_value.split_whitespace() {
                 expanded.push(part.to_string());
             }
@@ -47,7 +47,6 @@ pub fn expand_aliases(args: Vec<String>, config: &LdxConfig) -> Vec<String> {
             expanded.push(arg);
         }
     }
-
     expanded
 }
 
@@ -68,12 +67,10 @@ pub fn resolve_custom(args: Vec<String>, config: &LdxConfig) -> Vec<String> {
             let long = format!("--{}", custom.long);
 
             if *arg == short || *arg == long {
-                // Expand custom flag into its target action
                 if let (Some(action), Some(target)) = (&custom.action, &custom.target) {
                     match action.as_str() {
                         "set_value" => {
                             if let Some(value) = &custom.value {
-                                // e.g. [custom.pdf] → "-e pdf"
                                 let flag = config
                                     .flags
                                     .values()
@@ -108,7 +105,6 @@ pub fn resolve_custom(args: Vec<String>, config: &LdxConfig) -> Vec<String> {
         if !matched {
             resolved.push(arg.clone());
         }
-
         i += 1;
     }
 
@@ -116,7 +112,7 @@ pub fn resolve_custom(args: Vec<String>, config: &LdxConfig) -> Vec<String> {
 }
 
 // ---------------------------------------------------------------------------
-// Get flag short/long names from config by target
+// Helpers
 // ---------------------------------------------------------------------------
 
 fn get_flag_names(config: &LdxConfig, target: &str) -> (String, String) {
@@ -133,23 +129,17 @@ fn flag_matches(arg: &str, short: &str, long: &str) -> bool {
 }
 
 // ---------------------------------------------------------------------------
-// Parse raw args using config-defined flag names
+// Parse args
 // ---------------------------------------------------------------------------
 
 pub fn parse_args(config: &LdxConfig) -> Result<ParsedFlags> {
     let raw: Vec<String> = std::env::args().skip(1).collect();
-
-    // Step 1: expand aliases
     let raw = expand_aliases(raw, config);
-
-    // Step 2: resolve custom flags
     let raw = resolve_custom(raw, config);
 
     let max_threads = num_cpus::get();
 
-    // Build flag name lookups from config
     let (help_s, help_l) = get_flag_names(config, "help");
-    let (ver_s, ver_l) = ("--version".to_string(), "--version".to_string());
     let (quiet_s, quiet_l) = get_flag_names(config, "quiet");
     let (stats_s, stats_l) = get_flag_names(config, "stats");
     let (all_s, all_l) = get_flag_names(config, "all");
@@ -165,26 +155,33 @@ pub fn parse_args(config: &LdxConfig) -> Result<ParsedFlags> {
     let (limit_s, limit_l) = get_flag_names(config, "limit");
     let (cs_s, cs_l) = get_flag_names(config, "case_sensitive");
 
-    // FIX: Explicitly check for standard help flags in addition to config-defined ones
+    // Early-exit management flags
     let show_help = raw
         .iter()
         .any(|a| flag_matches(a, &help_s, &help_l) || a == "-h" || a == "--help");
-
-    // FIX: Explicitly check for standard version flags just in case
-    let show_version = raw
-        .iter()
-        .any(|a| flag_matches(a, &ver_s, &ver_l) || a == "-v" || a == "--version");
-
-    // Check for --config and --edit
+    let show_version = raw.iter().any(|a| a == "--version");
     let show_config = raw.iter().any(|a| a == "--config");
     let edit_config = raw.iter().any(|a| a == "--edit");
+    let check_config = raw.iter().any(|a| a == "--check");
+    let sync_config = raw.iter().any(|a| a == "--sync");
+    let reset_config = raw.iter().any(|a| a == "--reset");
 
-    if show_help || show_version || show_config || edit_config {
+    if show_help
+        || show_version
+        || show_config
+        || edit_config
+        || check_config
+        || sync_config
+        || reset_config
+    {
         return Ok(ParsedFlags {
             show_help,
             show_version,
             show_config,
             edit_config,
+            check_config,
+            sync_config,
+            reset_config,
             pattern: None,
             dir: ".".into(),
             extension: None,
@@ -217,9 +214,12 @@ pub fn parse_args(config: &LdxConfig) -> Result<ParsedFlags> {
     #[cfg(windows)]
     let all_drives = raw.iter().any(|a| flag_matches(a, &drives_s, &drives_l));
     #[cfg(not(windows))]
-    let all_drives = false;
+    let all_drives = {
+        let _ = (&drives_s, &drives_l);
+        false
+    };
 
-    // Value flags — look for flag then grab next arg
+    // Value flags
     let extension: Option<String> = raw
         .iter()
         .position(|a| flag_matches(a, &ext_s, &ext_l))
@@ -233,7 +233,8 @@ pub fn parse_args(config: &LdxConfig) -> Result<ParsedFlags> {
         .map(PathBuf::from)
         .unwrap_or_else(|| ".".into());
 
-    let threads: usize = raw.iter()
+    let threads: usize = raw
+        .iter()
         .position(|a| flag_matches(a, &threads_s, &threads_l))
         .and_then(|i| raw.get(i + 1))
         .and_then(|v| v.parse().ok())
@@ -256,15 +257,14 @@ pub fn parse_args(config: &LdxConfig) -> Result<ParsedFlags> {
         .and_then(|i| raw.get(i + 1))
         .and_then(|v| v.parse().ok());
 
-    // Parse --exclude flag
     let exclude: Vec<String> = raw
         .iter()
         .position(|a| a == "--exclude")
         .and_then(|i| raw.get(i + 1))
-        .map(|s| s.split(',').map(|part| part.trim().to_string()).collect())
+        .map(|s| s.split(',').map(|p| p.trim().to_string()).collect())
         .unwrap_or_default();
 
-    // Free arg (pattern) — anything not starting with '-' and not a value arg
+    // Free arg (pattern)
     let value_flags = [
         ext_s.as_str(),
         ext_l.as_str(),
@@ -279,7 +279,6 @@ pub fn parse_args(config: &LdxConfig) -> Result<ParsedFlags> {
 
     let mut pattern: Option<String> = None;
     let mut skip_next = false;
-
     for arg in &raw {
         if skip_next {
             skip_next = false;
@@ -295,20 +294,26 @@ pub fn parse_args(config: &LdxConfig) -> Result<ParsedFlags> {
         }
     }
 
-    // Validate unexpected args
+    // Validate unknown flags
     let known_flags: Vec<String> = config
         .flags
         .values()
         .flat_map(|f| vec![format!("-{}", f.short), format!("--{}", f.long)])
-        .chain(vec![
-            "--version".to_string(),
-            "-v".to_string(),
-            "--help".to_string(),
-            "-h".to_string(),
-            "--config".to_string(),
-            "--edit".to_string(),
-            "--exclude".to_string(),
-        ])
+        .chain(
+            [
+                "--version",
+                "--help",
+                "-h",
+                "--config",
+                "--edit",
+                "--check",
+                "--sync",
+                "--reset",
+                "--exclude",
+            ]
+            .iter()
+            .map(|s| s.to_string()),
+        )
         .collect();
 
     let mut skip_next = false;
@@ -321,42 +326,30 @@ pub fn parse_args(config: &LdxConfig) -> Result<ParsedFlags> {
             skip_next = true;
             continue;
         }
-        // Check if arg is a flag (starts with -) and NOT known
         if arg.starts_with('-') && !known_flags.contains(arg) {
-            bail!("Unexpected arg: {:?}. Run with --help for usage.", arg);
+            bail!("Unknown flag: {:?}. Run with --help for usage.", arg);
         }
     }
 
     // Validate flag combinations
     if first && limit.is_some() {
-        bail!("-1/--first and -L/--limit cannot be used together. Run with --help for usage.");
+        bail!("-1/--first and -L/--limit cannot be used together.");
     }
-
     if all && (pattern.is_some() || extension.is_some()) {
-        bail!(
-            "-a/--all-files cannot be combined with a pattern or -e/--extension. Run with --help for usage."
-        );
+        bail!("-a/--all-files cannot be combined with a pattern or -e/--extension.");
     }
-
     if open && all {
-        bail!("-o/--open cannot be combined with -a/--all-files. Run with --help for usage.");
+        bail!("-o/--open cannot be combined with -a/--all-files.");
     }
-
     if dirs_only && all {
-        bail!("-D/--dirs cannot be combined with -a/--all-files. Run with --help for usage.");
+        bail!("-D/--dirs cannot be combined with -a/--all-files.");
     }
-
     if dirs_only && extension.is_some() {
-        bail!("-D/--dirs cannot be combined with -e/--extension. Run with --help for usage.");
+        bail!("-D/--dirs cannot be combined with -e/--extension.");
     }
-
     if pattern.is_some() && extension.is_some() {
-        bail!(
-            "Cannot use both a pattern and -e/--extension at the same time. Run with --help for usage."
-        );
+        bail!("Cannot use both a pattern and -e/--extension at the same time.");
     }
-
-    // Only validate requirements if we are NOT showing help/version
     if !all && pattern.is_none() && extension.is_none() {
         bail!(
             "Either a pattern, -e/--extension, or -a/--all-files is required. Run with --help for usage."
@@ -385,5 +378,8 @@ pub fn parse_args(config: &LdxConfig) -> Result<ParsedFlags> {
         show_version,
         show_config,
         edit_config,
+        check_config,
+        sync_config,
+        reset_config,
     })
 }
