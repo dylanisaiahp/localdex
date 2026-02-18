@@ -149,9 +149,9 @@ ldx --reset   # restore all [flags] to defaults — aliases and custom flags are
 
 ## 📊 Benchmarks
 
-Peak result: **1,641,700 entries/s** on Windows SSD (i5-13400F, 16 threads).
+Peak result: **7,065,858 entries/s** on Linux NVMe (Ryzen 7 5825U, CachyOS, 16 threads). Windows peak: **1,641,700 entries/s** (i5-13400F, 16 threads).
 
-See [BENCHMARKS.md](BENCHMARKS.md) for full thread scaling tables, cold vs warm cache data, and hardware specs.
+See [BENCHMARKS.md](BENCHMARKS.md) for full thread scaling tables, Linux vs Windows comparisons, cold vs warm cache data, and hardware specs.
 
 ---
 
@@ -159,10 +159,10 @@ See [BENCHMARKS.md](BENCHMARKS.md) for full thread scaling tables, cold vs warm 
 
 | Script | Description |
 |--------|-------------|
-| `install.sh` | Install or update ldx — detects existing installs, checks for updates |
-| `build.sh` | Build and deploy ldx |
-| `benchmark.sh` | Benchmark across directories and thread counts — outputs CSV |
-| `uninstall.sh` | Cleanly remove ldx from your system |
+| `scripts/install.sh` | Install or update ldx — detects existing installs, checks for updates |
+| `scripts/build.sh` | Build and deploy ldx |
+| `scripts/benchmark.sh` | Benchmark across directories and thread counts — outputs CSV |
+| `scripts/uninstall.sh` | Cleanly remove ldx from your system |
 | `scripts/bump.sh` | Suggest and apply version bumps based on git log and roadmap |
 
 All scripts run on Windows via [Git Bash](https://gitforwindows.org/).
