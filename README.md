@@ -4,7 +4,7 @@
 
 **A blazing-fast file search CLI for Windows, Linux, and macOS**
 
-[![Version](https://img.shields.io/badge/version-0.0.4-blue.svg)](https://github.com/dylanisaiahp/localdex)
+[![Version](https://img.shields.io/badge/version-0.0.6-blue.svg)](https://github.com/dylanisaiahp/localdex)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![Built with Rust](https://img.shields.io/badge/built%20with-Rust-orange.svg)](https://www.rust-lang.org/)
 [![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20Linux%20%7C%20macOS-lightgrey.svg)](https://github.com/dylanisaiahp/localdex)
@@ -62,6 +62,9 @@ ldx -A -a -S                 # count every file on all drives
 ldx vintagestory -o -1       # find and launch a file
 ldx localdex -D -w           # find a directory and print cd command
 ldx -e log -L 5              # stop after 5 matches
+ldx main.rs --exclude target # search excluding target directory
+ldx --config                 # show config location
+ldx --edit                   # open config in editor
 ```
 
 ---
@@ -85,6 +88,9 @@ ldx -e log -L 5              # stop after 5 matches
 | `-t` | `--threads` | Number of threads (default: all available, capped at logical core count) | All |
 | `-v` | `--verbose` | Show detailed scan breakdown (files + dirs separately) | All |
 | `-w` | `--where` | Print path with cd hint (implies `-1`) | All |
+| | `--config` | Print config file location | All |
+| | `--edit` | Open config in default editor | All |
+| | `--exclude` | Skip directories (e.g. `--exclude node_modules,target,.git`) | All |
 
 > **Note:** `-d` sets *where* to search. `-D` searches *for* directories. Similarly, `-s` is case-sensitive and `-S` shows stats.
 
@@ -102,9 +108,15 @@ short = "S"
 long = "stats"
 description = "Show scan statistics"
 os = "all"
+
+# User-defined aliases (v0.0.6+)
+[aliases]
+repo = "localdex -D -d D: -1 -S -w -q"
+ct = "-a -A -S -q --verbose"
+pl = "-e rs -e py -e js"
 ```
 
-Future versions will support user-defined aliases and scripting directly in `config.toml`.
+Aliases and custom flags are fully supported!
 
 ---
 
@@ -139,10 +151,11 @@ Linux and macOS benchmark results are especially valuable — open an issue or P
 
 ## 🗺️ Roadmap
 
-### v0.0.5
-- Scriptable flags and user-defined aliases in `config.toml`
+### v0.0.7 (next)
+- `--check`, `--sync`, `--reset` config management
+- Dynamic `--help` showing user's custom aliases
 
-### v0.1.0 (stable)
+### v0.1.0 (beta)
 - Codebase audit — cut bloat, improve clarity
 - Unit tests for edge cases
 - Full Linux and macOS benchmark data
@@ -159,11 +172,13 @@ Linux and macOS benchmark results are especially valuable — open an issue or P
 
 | Range | Stage | Description |
 |-------|-------|-------------|
-| `v0.0.X` | **experimental** | Early development, anything can change |
-| `v0.X.X` | **stable** | Feature complete, production usable |
-| `v26.X` | **release** | Year-versioned, fully polished |
+| `v0.0.X` | **experimental** | Early development, rapid iteration |
+| `v0.X.X` | **beta** | Code polish, engine separation, GUI design |
+| `r1.0` | **stable release** | Production-ready, battle-tested |
+| `r1.X` | **refinements** | Minor updates and fixes |
+| `r2.0` | **major leap** | Significant performance or feature breakthroughs |
 
-> The jump from `v0.X.X` to `v26.X` is intentional — the year prefix signals a production-ready release. Inspired by Ubuntu's year-based versioning.
+> The `r` prefix signals "production-ready." Clean, simple versioning.
 
 ---
 
