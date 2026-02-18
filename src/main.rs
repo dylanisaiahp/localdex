@@ -21,6 +21,14 @@ use search::get_all_drives;
 
 fn main() -> Result<()> {
     let ldx_config = load_config()?;
+
+    // Get config path for --config and --edit flags
+    let config_path = std::env::current_exe()
+        .unwrap_or_else(|_| PathBuf::from("."))
+        .parent()
+        .unwrap_or_else(|| std::path::Path::new("."))
+        .join("config.toml");
+
     let f = parse_args(&ldx_config)?;
 
     if f.show_help {
@@ -29,7 +37,33 @@ fn main() -> Result<()> {
     }
 
     if f.show_version {
-        println!("localdex v0.0.5");
+        println!("localdex v0.0.6");
+        return Ok(());
+    }
+
+    if f.show_config {
+        println!("Config: {}", config_path.display());
+        return Ok(());
+    }
+
+    if f.edit_config {
+        println!("Opening config: {}", config_path.display());
+
+        #[cfg(windows)]
+        std::process::Command::new("cmd")
+            .args(["/c", "start", "", &config_path.to_string_lossy()])
+            .spawn()?;
+
+        #[cfg(target_os = "macos")]
+        std::process::Command::new("open")
+            .arg(&config_path)
+            .spawn()?;
+
+        #[cfg(target_os = "linux")]
+        std::process::Command::new("xdg-open")
+            .arg(&config_path)
+            .spawn()?;
+
         return Ok(());
     }
 
@@ -89,14 +123,15 @@ fn main() -> Result<()> {
 
         let config = Config {
             case_sensitive: f.case_sensitive,
-            quiet:          f.quiet,
-            all:            f.all,
-            dirs_only:      f.dirs_only,
-            extension:      f.extension.clone(),
+            quiet: f.quiet,
+            all: f.all,
+            dirs_only: f.dirs_only,
+            extension: f.extension.clone(),
             matcher,
-            limit:          f.limit,
-            threads:        f.threads,
-            collect_paths:  f.open || f.where_mode,
+            limit: f.limit,
+            threads: f.threads,
+            collect_paths: f.open || f.where_mode,
+            exclude: f.exclude.clone(),
         };
 
         let result = scan_dir(&dir, &config);
@@ -197,14 +232,15 @@ fn main() -> Result<()> {
 
             let config = Config {
                 case_sensitive: f.case_sensitive,
-                quiet:          f.quiet,
-                all:            f.all,
-                dirs_only:      f.dirs_only,
-                extension:      f.extension.clone(),
+                quiet: f.quiet,
+                all: f.all,
+                dirs_only: f.dirs_only,
+                extension: f.extension.clone(),
                 matcher,
-                limit:          f.limit,
-                threads:        f.threads,
-                collect_paths:  f.open,
+                limit: f.limit,
+                threads: f.threads,
+                collect_paths: f.open,
+                exclude: f.exclude.clone(),
             };
 
             let total_start = Instant::now();

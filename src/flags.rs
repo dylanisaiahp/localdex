@@ -8,22 +8,25 @@ use crate::config::LdxConfig;
 // ---------------------------------------------------------------------------
 
 pub struct ParsedFlags {
-    pub pattern:        Option<String>,
-    pub dir:            PathBuf,
-    pub extension:      Option<String>,
-    pub threads:        usize,
-    pub quiet:          bool,
-    pub stats:          bool,
-    pub all:            bool,
-    pub verbose:        bool,
-    pub open:           bool,
-    pub dirs_only:      bool,
-    pub where_mode:     bool,
-    pub all_drives:     bool,
+    pub pattern: Option<String>,
+    pub dir: PathBuf,
+    pub extension: Option<String>,
+    pub threads: usize,
+    pub quiet: bool,
+    pub stats: bool,
+    pub all: bool,
+    pub verbose: bool,
+    pub open: bool,
+    pub dirs_only: bool,
+    pub where_mode: bool,
+    pub all_drives: bool,
     pub case_sensitive: bool,
-    pub limit:          Option<usize>,
-    pub show_help:      bool,
-    pub show_version:   bool,
+    pub limit: Option<usize>,
+    pub exclude: Vec<String>,
+    pub show_help: bool,
+    pub show_version: bool,
+    pub show_config: bool,
+    pub edit_config: bool,
 }
 
 // ---------------------------------------------------------------------------
@@ -71,7 +74,9 @@ pub fn resolve_custom(args: Vec<String>, config: &LdxConfig) -> Vec<String> {
                         "set_value" => {
                             if let Some(value) = &custom.value {
                                 // e.g. [custom.pdf] → "-e pdf"
-                                let flag = config.flags.values()
+                                let flag = config
+                                    .flags
+                                    .values()
                                     .find(|f| f.target.as_deref() == Some(target.as_str()))
                                     .map(|f| format!("-{}", f.short))
                                     .unwrap_or_default();
@@ -82,7 +87,9 @@ pub fn resolve_custom(args: Vec<String>, config: &LdxConfig) -> Vec<String> {
                             }
                         }
                         "set_boolean" => {
-                            let flag = config.flags.values()
+                            let flag = config
+                                .flags
+                                .values()
                                 .find(|f| f.target.as_deref() == Some(target.as_str()))
                                 .map(|f| format!("-{}", f.short))
                                 .unwrap_or_default();
@@ -113,7 +120,9 @@ pub fn resolve_custom(args: Vec<String>, config: &LdxConfig) -> Vec<String> {
 // ---------------------------------------------------------------------------
 
 fn get_flag_names(config: &LdxConfig, target: &str) -> (String, String) {
-    config.flags.values()
+    config
+        .flags
+        .values()
         .find(|f| f.target.as_deref() == Some(target))
         .map(|f| (format!("-{}", f.short), format!("--{}", f.long)))
         .unwrap_or_default()
@@ -139,58 +148,71 @@ pub fn parse_args(config: &LdxConfig) -> Result<ParsedFlags> {
     let max_threads = num_cpus::get();
 
     // Build flag name lookups from config
-    let (help_s, help_l)         = get_flag_names(config, "help");
-    let (ver_s, ver_l)           = ("--version".to_string(), "--version".to_string());
-    let (quiet_s, quiet_l)       = get_flag_names(config, "quiet");
-    let (stats_s, stats_l)       = get_flag_names(config, "stats");
-    let (all_s, all_l)           = get_flag_names(config, "all");
-    let (verbose_s, verbose_l)   = get_flag_names(config, "verbose");
-    let (first_s, first_l)       = get_flag_names(config, "first");
-    let (open_s, open_l)         = get_flag_names(config, "open");
-    let (dirs_s, dirs_l)         = get_flag_names(config, "dirs_only");
-    let (where_s, where_l)       = get_flag_names(config, "where_mode");
-    let (drives_s, drives_l)     = get_flag_names(config, "all_drives");
-    let (ext_s, ext_l)           = get_flag_names(config, "extension");
-    let (dir_s, dir_l)           = get_flag_names(config, "dir");
-    let (threads_s, threads_l)   = get_flag_names(config, "threads");
-    let (limit_s, limit_l)       = get_flag_names(config, "limit");
-    let (cs_s, cs_l)             = get_flag_names(config, "case_sensitive");
+    let (help_s, help_l) = get_flag_names(config, "help");
+    let (ver_s, ver_l) = ("--version".to_string(), "--version".to_string());
+    let (quiet_s, quiet_l) = get_flag_names(config, "quiet");
+    let (stats_s, stats_l) = get_flag_names(config, "stats");
+    let (all_s, all_l) = get_flag_names(config, "all");
+    let (verbose_s, verbose_l) = get_flag_names(config, "verbose");
+    let (first_s, first_l) = get_flag_names(config, "first");
+    let (open_s, open_l) = get_flag_names(config, "open");
+    let (dirs_s, dirs_l) = get_flag_names(config, "dirs_only");
+    let (where_s, where_l) = get_flag_names(config, "where_mode");
+    let (drives_s, drives_l) = get_flag_names(config, "all_drives");
+    let (ext_s, ext_l) = get_flag_names(config, "extension");
+    let (dir_s, dir_l) = get_flag_names(config, "dir");
+    let (threads_s, threads_l) = get_flag_names(config, "threads");
+    let (limit_s, limit_l) = get_flag_names(config, "limit");
+    let (cs_s, cs_l) = get_flag_names(config, "case_sensitive");
 
-    // Ignore help/version — handled in main before parse_args
-    let show_help    = raw.iter().any(|a| flag_matches(a, &help_s, &help_l));
-    let show_version = raw.iter().any(|a| flag_matches(a, &ver_s, &ver_l));
+    // FIX: Explicitly check for standard help flags in addition to config-defined ones
+    let show_help = raw
+        .iter()
+        .any(|a| flag_matches(a, &help_s, &help_l) || a == "-h" || a == "--help");
 
-    if show_help || show_version {
+    // FIX: Explicitly check for standard version flags just in case
+    let show_version = raw
+        .iter()
+        .any(|a| flag_matches(a, &ver_s, &ver_l) || a == "-v" || a == "--version");
+
+    // Check for --config and --edit
+    let show_config = raw.iter().any(|a| a == "--config");
+    let edit_config = raw.iter().any(|a| a == "--edit");
+
+    if show_help || show_version || show_config || edit_config {
         return Ok(ParsedFlags {
             show_help,
             show_version,
-            pattern:        None,
-            dir:            ".".into(),
-            extension:      None,
-            threads:        max_threads,
-            quiet:          false,
-            stats:          false,
-            all:            false,
-            verbose:        false,
-            open:           false,
-            dirs_only:      false,
-            where_mode:     false,
-            all_drives:     false,
+            show_config,
+            edit_config,
+            pattern: None,
+            dir: ".".into(),
+            extension: None,
+            threads: max_threads,
+            quiet: false,
+            stats: false,
+            all: false,
+            verbose: false,
+            open: false,
+            dirs_only: false,
+            where_mode: false,
+            all_drives: false,
             case_sensitive: false,
-            limit:          None,
+            limit: None,
+            exclude: Vec::new(),
         });
     }
 
     // Boolean flags
-    let quiet      = raw.iter().any(|a| flag_matches(a, &quiet_s,   &quiet_l));
-    let stats      = raw.iter().any(|a| flag_matches(a, &stats_s,   &stats_l));
-    let all        = raw.iter().any(|a| flag_matches(a, &all_s,     &all_l));
-    let verbose    = raw.iter().any(|a| flag_matches(a, &verbose_s, &verbose_l));
-    let first      = raw.iter().any(|a| flag_matches(a, &first_s,   &first_l));
-    let open       = raw.iter().any(|a| flag_matches(a, &open_s,    &open_l));
-    let dirs_only  = raw.iter().any(|a| flag_matches(a, &dirs_s,    &dirs_l));
-    let where_mode     = raw.iter().any(|a| flag_matches(a, &where_s,   &where_l));
-    let case_sensitive = raw.iter().any(|a| flag_matches(a, &cs_s,     &cs_l));
+    let quiet = raw.iter().any(|a| flag_matches(a, &quiet_s, &quiet_l));
+    let stats = raw.iter().any(|a| flag_matches(a, &stats_s, &stats_l));
+    let all = raw.iter().any(|a| flag_matches(a, &all_s, &all_l));
+    let verbose = raw.iter().any(|a| flag_matches(a, &verbose_s, &verbose_l));
+    let first = raw.iter().any(|a| flag_matches(a, &first_s, &first_l));
+    let open = raw.iter().any(|a| flag_matches(a, &open_s, &open_l));
+    let dirs_only = raw.iter().any(|a| flag_matches(a, &dirs_s, &dirs_l));
+    let where_mode = raw.iter().any(|a| flag_matches(a, &where_s, &where_l));
+    let case_sensitive = raw.iter().any(|a| flag_matches(a, &cs_s, &cs_l));
 
     #[cfg(windows)]
     let all_drives = raw.iter().any(|a| flag_matches(a, &drives_s, &drives_l));
@@ -198,12 +220,14 @@ pub fn parse_args(config: &LdxConfig) -> Result<ParsedFlags> {
     let all_drives = false;
 
     // Value flags — look for flag then grab next arg
-    let extension: Option<String> = raw.iter()
+    let extension: Option<String> = raw
+        .iter()
         .position(|a| flag_matches(a, &ext_s, &ext_l))
         .and_then(|i| raw.get(i + 1))
         .map(|s| s.trim_start_matches('.').to_lowercase());
 
-    let dir: PathBuf = raw.iter()
+    let dir: PathBuf = raw
+        .iter()
         .position(|a| flag_matches(a, &dir_s, &dir_l))
         .and_then(|i| raw.get(i + 1))
         .map(PathBuf::from)
@@ -226,17 +250,31 @@ pub fn parse_args(config: &LdxConfig) -> Result<ParsedFlags> {
         })
         .unwrap_or(max_threads);
 
-    let limit: Option<usize> = raw.iter()
+    let limit: Option<usize> = raw
+        .iter()
         .position(|a| flag_matches(a, &limit_s, &limit_l))
         .and_then(|i| raw.get(i + 1))
         .and_then(|v| v.parse().ok());
 
+    // Parse --exclude flag
+    let exclude: Vec<String> = raw
+        .iter()
+        .position(|a| a == "--exclude")
+        .and_then(|i| raw.get(i + 1))
+        .map(|s| s.split(',').map(|part| part.trim().to_string()).collect())
+        .unwrap_or_default();
+
     // Free arg (pattern) — anything not starting with '-' and not a value arg
     let value_flags = [
-        ext_s.as_str(), ext_l.as_str(),
-        dir_s.as_str(), dir_l.as_str(),
-        threads_s.as_str(), threads_l.as_str(),
-        limit_s.as_str(), limit_l.as_str(),
+        ext_s.as_str(),
+        ext_l.as_str(),
+        dir_s.as_str(),
+        dir_l.as_str(),
+        threads_s.as_str(),
+        threads_l.as_str(),
+        limit_s.as_str(),
+        limit_l.as_str(),
+        "--exclude",
     ];
 
     let mut pattern: Option<String> = None;
@@ -258,15 +296,32 @@ pub fn parse_args(config: &LdxConfig) -> Result<ParsedFlags> {
     }
 
     // Validate unexpected args
-    let known_flags: Vec<String> = config.flags.values()
+    let known_flags: Vec<String> = config
+        .flags
+        .values()
         .flat_map(|f| vec![format!("-{}", f.short), format!("--{}", f.long)])
-        .chain(std::iter::once("--version".to_string()))
+        .chain(vec![
+            "--version".to_string(),
+            "-v".to_string(),
+            "--help".to_string(),
+            "-h".to_string(),
+            "--config".to_string(),
+            "--edit".to_string(),
+            "--exclude".to_string(),
+        ])
         .collect();
 
     let mut skip_next = false;
     for arg in &raw {
-        if skip_next { skip_next = false; continue; }
-        if value_flags.contains(&arg.as_str()) { skip_next = true; continue; }
+        if skip_next {
+            skip_next = false;
+            continue;
+        }
+        if value_flags.contains(&arg.as_str()) {
+            skip_next = true;
+            continue;
+        }
+        // Check if arg is a flag (starts with -) and NOT known
         if arg.starts_with('-') && !known_flags.contains(arg) {
             bail!("Unexpected arg: {:?}. Run with --help for usage.", arg);
         }
@@ -278,7 +333,9 @@ pub fn parse_args(config: &LdxConfig) -> Result<ParsedFlags> {
     }
 
     if all && (pattern.is_some() || extension.is_some()) {
-        bail!("-a/--all-files cannot be combined with a pattern or -e/--extension. Run with --help for usage.");
+        bail!(
+            "-a/--all-files cannot be combined with a pattern or -e/--extension. Run with --help for usage."
+        );
     }
 
     if open && all {
@@ -294,11 +351,16 @@ pub fn parse_args(config: &LdxConfig) -> Result<ParsedFlags> {
     }
 
     if pattern.is_some() && extension.is_some() {
-        bail!("Cannot use both a pattern and -e/--extension at the same time. Run with --help for usage.");
+        bail!(
+            "Cannot use both a pattern and -e/--extension at the same time. Run with --help for usage."
+        );
     }
 
-    if !all && pattern.is_none() && extension.is_none() && !show_help && !show_version {
-        bail!("Either a pattern, -e/--extension, or -a/--all-files is required. Run with --help for usage.");
+    // Only validate requirements if we are NOT showing help/version
+    if !all && pattern.is_none() && extension.is_none() {
+        bail!(
+            "Either a pattern, -e/--extension, or -a/--all-files is required. Run with --help for usage."
+        );
     }
 
     let limit = if first || where_mode { Some(1) } else { limit };
@@ -318,7 +380,10 @@ pub fn parse_args(config: &LdxConfig) -> Result<ParsedFlags> {
         all_drives,
         case_sensitive,
         limit,
+        exclude,
         show_help,
         show_version,
+        show_config,
+        edit_config,
     })
 }

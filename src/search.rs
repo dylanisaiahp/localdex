@@ -21,6 +21,7 @@ pub struct Config {
     pub limit: Option<usize>,
     pub threads: usize,
     pub collect_paths: bool,
+    pub exclude: Vec<String>,
 }
 
 // ---------------------------------------------------------------------------
@@ -68,6 +69,7 @@ pub fn scan_dir(dir: &PathBuf, config: &Config) -> ScanResult {
         let collect_paths = config.collect_paths;
         let scan_dir = dir.clone();
         let matcher = config.matcher.clone();
+        let excluded_dirs = config.exclude.clone();
         let matches = Arc::clone(&matches);
         let files = Arc::clone(&files);
         let dirs_count = Arc::clone(&dirs_count);
@@ -87,6 +89,12 @@ pub fn scan_dir(dir: &PathBuf, config: &Config) -> ScanResult {
 
             if ft.is_dir() {
                 dirs_count.fetch_add(1, Ordering::Relaxed);
+
+                // Check if this directory should be excluded
+                let dir_name = entry.file_name().to_string_lossy();
+                if excluded_dirs.iter().any(|ex| dir_name.as_ref() == ex.as_str()) {
+                    return WalkState::Skip;
+                }
 
                 if dirs_only {
                     // Skip the root dir itself
