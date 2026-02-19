@@ -37,6 +37,66 @@ pub struct ScanResult {
 }
 
 // ---------------------------------------------------------------------------
+// Shared match handler — called when an entry matches the search criteria.
+//
+// Increments the match counter, enforces the limit (two-guard approach to
+// handle the race condition where multiple threads overshoot before
+// WalkState::Quit propagates), collects the path, and prints the result.
+//
+// `suppress_output` — true when -a/--all-files is active (file mode only;
+// we still count but never print individual filenames in -a mode).
+// ---------------------------------------------------------------------------
+
+struct MatchCtx<'a> {
+    matches: &'a Arc<AtomicUsize>,
+    paths: &'a Arc<Mutex<Vec<PathBuf>>>,
+    limit: Option<usize>,
+    collect_paths: bool,
+    quiet: bool,
+    suppress_output: bool,
+    scan_dir: &'a PathBuf,
+}
+
+fn handle_match(entry: &DirEntry, ctx: &MatchCtx<'_>) -> WalkState {
+    let mc = ctx.matches.fetch_add(1, Ordering::Relaxed) + 1;
+
+    // Early guard: quit before printing/collecting if already over limit
+    if let Some(lim) = ctx.limit
+        && mc > lim
+    {
+        return WalkState::Quit;
+    }
+
+    if ctx.collect_paths
+        && let Ok(mut p) = ctx.paths.lock()
+    {
+        p.push(entry.path().to_path_buf());
+    }
+
+    if !ctx.quiet && !ctx.suppress_output {
+        let rel = entry
+            .path()
+            .strip_prefix(ctx.scan_dir)
+            .unwrap_or(entry.path());
+        let disp = if rel.as_os_str().is_empty() {
+            ".".to_string()
+        } else {
+            rel.to_string_lossy().into_owned()
+        };
+        println!("{}", disp.bright_cyan());
+    }
+
+    // At-limit guard: quit after printing if we've hit the limit exactly
+    if let Some(lim) = ctx.limit
+        && mc >= lim
+    {
+        return WalkState::Quit;
+    }
+
+    WalkState::Continue
+}
+
+// ---------------------------------------------------------------------------
 // Single drive/directory scan
 // ---------------------------------------------------------------------------
 
@@ -90,7 +150,7 @@ pub fn scan_dir(dir: &PathBuf, config: &Config) -> ScanResult {
             if ft.is_dir() {
                 dirs_count.fetch_add(1, Ordering::Relaxed);
 
-                // Check if this directory should be excluded
+                // Skip excluded directories
                 let dir_name = entry.file_name().to_string_lossy();
                 if excluded_dirs
                     .iter()
@@ -99,60 +159,36 @@ pub fn scan_dir(dir: &PathBuf, config: &Config) -> ScanResult {
                     return WalkState::Skip;
                 }
 
-                if dirs_only {
-                    // Skip the root dir itself
-                    if entry.depth() == 0 {
-                        return WalkState::Continue;
-                    }
-
-                    let matched = if let Some(ref m) = matcher {
-                        let name = entry.file_name().to_string_lossy();
-                        m.is_match(name.as_ref())
-                    } else {
-                        true
-                    };
+                if dirs_only && entry.depth() > 0 {
+                    let matched = matcher
+                        .as_ref()
+                        .is_none_or(|m| m.is_match(entry.file_name().to_string_lossy().as_ref()));
 
                     if matched {
-                        let mc = matches.fetch_add(1, Ordering::Relaxed) + 1;
-
-                        // Quit immediately if we've exceeded the limit — don't print or collect
-                        if let Some(lim) = limit
-                            && mc > lim
-                        {
-                            return WalkState::Quit;
-                        }
-
-                        if collect_paths && let Ok(mut p) = paths.lock() {
-                            p.push(entry.path().to_path_buf());
-                        }
-
-                        if !quiet {
-                            let rel = entry.path().strip_prefix(&scan_dir).unwrap_or(entry.path());
-                            let disp = if rel.as_os_str().is_empty() {
-                                ".".to_string()
-                            } else {
-                                rel.to_string_lossy().into_owned()
-                            };
-                            println!("{}", disp.bright_cyan());
-                        }
-
-                        if let Some(lim) = limit
-                            && mc >= lim
-                        {
-                            return WalkState::Quit;
-                        }
+                        return handle_match(
+                            &entry,
+                            &MatchCtx {
+                                matches: &matches,
+                                paths: &paths,
+                                limit,
+                                collect_paths,
+                                quiet,
+                                suppress_output: false, // dirs are never suppressed
+                                scan_dir: &scan_dir,
+                            },
+                        );
                     }
                 }
 
                 return WalkState::Continue;
             }
+
             if !ft.is_file() {
                 return WalkState::Continue;
             }
 
             files.fetch_add(1, Ordering::Relaxed);
 
-            // Skip files when in dirs_only mode
             if dirs_only {
                 return WalkState::Continue;
             }
@@ -168,41 +204,24 @@ pub fn scan_dir(dir: &PathBuf, config: &Config) -> ScanResult {
                     }
                 })
             } else if let Some(ref m) = matcher {
-                let name = entry.file_name().to_string_lossy();
-                m.is_match(name.as_ref())
+                m.is_match(entry.file_name().to_string_lossy().as_ref())
             } else {
                 false
             };
 
             if matched {
-                let mc = matches.fetch_add(1, Ordering::Relaxed) + 1;
-
-                // Quit immediately if we've exceeded the limit — don't print or collect
-                if let Some(lim) = limit
-                    && mc > lim
-                {
-                    return WalkState::Quit;
-                }
-
-                if collect_paths && let Ok(mut p) = paths.lock() {
-                    p.push(entry.path().to_path_buf());
-                }
-
-                if !quiet && !all {
-                    let rel = entry.path().strip_prefix(&scan_dir).unwrap_or(entry.path());
-                    let disp = if rel.as_os_str().is_empty() {
-                        ".".to_string()
-                    } else {
-                        rel.to_string_lossy().into_owned()
-                    };
-                    println!("{}", disp.bright_cyan());
-                }
-
-                if let Some(lim) = limit
-                    && mc >= lim
-                {
-                    return WalkState::Quit;
-                }
+                return handle_match(
+                    &entry,
+                    &MatchCtx {
+                        matches: &matches,
+                        paths: &paths,
+                        limit,
+                        collect_paths,
+                        quiet,
+                        suppress_output: all, // suppress individual output in -a mode
+                        scan_dir: &scan_dir,
+                    },
+                );
             }
 
             WalkState::Continue
