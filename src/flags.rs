@@ -7,6 +7,7 @@ use crate::config::LdxConfig;
 // Parsed flags
 // ---------------------------------------------------------------------------
 
+#[derive(Default)]
 pub struct ParsedFlags {
     pub pattern: Option<String>,
     pub dir: PathBuf,
@@ -37,17 +38,18 @@ pub struct ParsedFlags {
 // ---------------------------------------------------------------------------
 
 pub fn expand_aliases(args: Vec<String>, config: &LdxConfig) -> Vec<String> {
-    let mut expanded = Vec::new();
-    for arg in args {
-        if let Some(alias_value) = config.aliases.get(&arg) {
-            for part in alias_value.split_whitespace() {
-                expanded.push(part.to_string());
+    args.into_iter()
+        .flat_map(|arg| {
+            if let Some(alias_value) = config.aliases.get(&arg) {
+                alias_value
+                    .split_whitespace()
+                    .map(|s| s.to_string())
+                    .collect()
+            } else {
+                vec![arg]
             }
-        } else {
-            expanded.push(arg);
-        }
-    }
-    expanded
+        })
+        .collect()
 }
 
 // ---------------------------------------------------------------------------
@@ -56,10 +58,8 @@ pub fn expand_aliases(args: Vec<String>, config: &LdxConfig) -> Vec<String> {
 
 pub fn resolve_custom(args: Vec<String>, config: &LdxConfig) -> Vec<String> {
     let mut resolved = Vec::new();
-    let mut i = 0;
 
-    while i < args.len() {
-        let arg = &args[i];
+    for arg in &args {
         let mut matched = false;
 
         for custom in config.custom.values() {
@@ -68,15 +68,20 @@ pub fn resolve_custom(args: Vec<String>, config: &LdxConfig) -> Vec<String> {
 
             if *arg == short || *arg == long {
                 if let (Some(action), Some(target)) = (&custom.action, &custom.target) {
+                    // Find the built-in flag that corresponds to this custom flag's target
+                    let find_flag = || {
+                        config
+                            .flags
+                            .values()
+                            .find(|f| f.target.as_deref() == Some(target.as_str()))
+                            .map(|f| format!("-{}", f.short))
+                            .unwrap_or_default()
+                    };
+
                     match action.as_str() {
                         "set_value" => {
                             if let Some(value) = &custom.value {
-                                let flag = config
-                                    .flags
-                                    .values()
-                                    .find(|f| f.target.as_deref() == Some(target.as_str()))
-                                    .map(|f| format!("-{}", f.short))
-                                    .unwrap_or_default();
+                                let flag = find_flag();
                                 if !flag.is_empty() {
                                     resolved.push(flag);
                                     resolved.push(value.clone());
@@ -84,12 +89,7 @@ pub fn resolve_custom(args: Vec<String>, config: &LdxConfig) -> Vec<String> {
                             }
                         }
                         "set_boolean" => {
-                            let flag = config
-                                .flags
-                                .values()
-                                .find(|f| f.target.as_deref() == Some(target.as_str()))
-                                .map(|f| format!("-{}", f.short))
-                                .unwrap_or_default();
+                            let flag = find_flag();
                             if !flag.is_empty() {
                                 resolved.push(flag);
                             }
@@ -105,7 +105,6 @@ pub fn resolve_custom(args: Vec<String>, config: &LdxConfig) -> Vec<String> {
         if !matched {
             resolved.push(arg.clone());
         }
-        i += 1;
     }
 
     resolved
@@ -115,6 +114,7 @@ pub fn resolve_custom(args: Vec<String>, config: &LdxConfig) -> Vec<String> {
 // Helpers
 // ---------------------------------------------------------------------------
 
+/// Look up the short/long flag names for a given target in config.
 fn get_flag_names(config: &LdxConfig, target: &str) -> (String, String) {
     config
         .flags
@@ -124,6 +124,7 @@ fn get_flag_names(config: &LdxConfig, target: &str) -> (String, String) {
         .unwrap_or_default()
 }
 
+/// Returns true if `arg` matches either the short or long form of a flag.
 fn flag_matches(arg: &str, short: &str, long: &str) -> bool {
     arg == short || arg == long
 }
@@ -155,7 +156,8 @@ pub fn parse_args(config: &LdxConfig) -> Result<ParsedFlags> {
     let (limit_s, limit_l) = get_flag_names(config, "limit");
     let (cs_s, cs_l) = get_flag_names(config, "case_sensitive");
 
-    // Early-exit management flags
+    // ── Management flags (early exit) ────────────────────────────────────────
+
     let show_help = raw
         .iter()
         .any(|a| flag_matches(a, &help_s, &help_l) || a == "-h" || a == "--help");
@@ -182,44 +184,27 @@ pub fn parse_args(config: &LdxConfig) -> Result<ParsedFlags> {
             check_config,
             sync_config,
             reset_config,
-            pattern: None,
             dir: ".".into(),
-            extension: None,
             threads: max_threads,
-            quiet: false,
-            stats: false,
-            all: false,
-            verbose: false,
-            open: false,
-            dirs_only: false,
-            where_mode: false,
-            all_drives: false,
-            case_sensitive: false,
-            limit: None,
-            exclude: Vec::new(),
+            ..Default::default()
         });
     }
 
-    // Boolean flags
-    let quiet = raw.iter().any(|a| flag_matches(a, &quiet_s, &quiet_l));
-    let stats = raw.iter().any(|a| flag_matches(a, &stats_s, &stats_l));
-    let all = raw.iter().any(|a| flag_matches(a, &all_s, &all_l));
-    let verbose = raw.iter().any(|a| flag_matches(a, &verbose_s, &verbose_l));
-    let first = raw.iter().any(|a| flag_matches(a, &first_s, &first_l));
-    let open = raw.iter().any(|a| flag_matches(a, &open_s, &open_l));
-    let dirs_only = raw.iter().any(|a| flag_matches(a, &dirs_s, &dirs_l));
-    let where_mode = raw.iter().any(|a| flag_matches(a, &where_s, &where_l));
-    let case_sensitive = raw.iter().any(|a| flag_matches(a, &cs_s, &cs_l));
+    // ── Value flags (need the next arg) ──────────────────────────────────────
 
-    #[cfg(windows)]
-    let all_drives = raw.iter().any(|a| flag_matches(a, &drives_s, &drives_l));
-    #[cfg(not(windows))]
-    let all_drives = {
-        let _ = (&drives_s, &drives_l);
-        false
-    };
+    // Built once, used for both pattern extraction and unknown flag validation
+    let value_flags = [
+        ext_s.as_str(),
+        ext_l.as_str(),
+        dir_s.as_str(),
+        dir_l.as_str(),
+        threads_s.as_str(),
+        threads_l.as_str(),
+        limit_s.as_str(),
+        limit_l.as_str(),
+        "--exclude",
+    ];
 
-    // Value flags
     let extension: Option<String> = raw
         .iter()
         .position(|a| flag_matches(a, &ext_s, &ext_l))
@@ -264,37 +249,28 @@ pub fn parse_args(config: &LdxConfig) -> Result<ParsedFlags> {
         .map(|s| s.split(',').map(|p| p.trim().to_string()).collect())
         .unwrap_or_default();
 
-    // Free arg (pattern)
-    let value_flags = [
-        ext_s.as_str(),
-        ext_l.as_str(),
-        dir_s.as_str(),
-        dir_l.as_str(),
-        threads_s.as_str(),
-        threads_l.as_str(),
-        limit_s.as_str(),
-        limit_l.as_str(),
-        "--exclude",
-    ];
+    // ── Boolean flags ─────────────────────────────────────────────────────────
 
-    let mut pattern: Option<String> = None;
-    let mut skip_next = false;
-    for arg in &raw {
-        if skip_next {
-            skip_next = false;
-            continue;
-        }
-        if value_flags.contains(&arg.as_str()) {
-            skip_next = true;
-            continue;
-        }
-        if !arg.starts_with('-') {
-            pattern = Some(arg.clone());
-            break;
-        }
-    }
+    let quiet = raw.iter().any(|a| flag_matches(a, &quiet_s, &quiet_l));
+    let stats = raw.iter().any(|a| flag_matches(a, &stats_s, &stats_l));
+    let all = raw.iter().any(|a| flag_matches(a, &all_s, &all_l));
+    let verbose = raw.iter().any(|a| flag_matches(a, &verbose_s, &verbose_l));
+    let first = raw.iter().any(|a| flag_matches(a, &first_s, &first_l));
+    let open = raw.iter().any(|a| flag_matches(a, &open_s, &open_l));
+    let dirs_only = raw.iter().any(|a| flag_matches(a, &dirs_s, &dirs_l));
+    let where_mode = raw.iter().any(|a| flag_matches(a, &where_s, &where_l));
+    let case_sensitive = raw.iter().any(|a| flag_matches(a, &cs_s, &cs_l));
 
-    // Validate unknown flags
+    #[cfg(windows)]
+    let all_drives = raw.iter().any(|a| flag_matches(a, &drives_s, &drives_l));
+    #[cfg(not(windows))]
+    let all_drives = {
+        let _ = (&drives_s, &drives_l);
+        false
+    };
+
+    // ── Pattern extraction + unknown flag validation (single pass) ────────────
+
     let known_flags: Vec<String> = config
         .flags
         .values()
@@ -316,7 +292,9 @@ pub fn parse_args(config: &LdxConfig) -> Result<ParsedFlags> {
         )
         .collect();
 
+    let mut pattern: Option<String> = None;
     let mut skip_next = false;
+
     for arg in &raw {
         if skip_next {
             skip_next = false;
@@ -326,12 +304,17 @@ pub fn parse_args(config: &LdxConfig) -> Result<ParsedFlags> {
             skip_next = true;
             continue;
         }
-        if arg.starts_with('-') && !known_flags.contains(arg) {
-            bail!("Unknown flag: {:?}. Run with --help for usage.", arg);
+        if arg.starts_with('-') {
+            if !known_flags.contains(arg) {
+                bail!("Unknown flag: {:?}. Run with --help for usage.", arg);
+            }
+        } else if pattern.is_none() {
+            pattern = Some(arg.clone());
         }
     }
 
-    // Validate flag combinations
+    // ── Validate flag combinations ────────────────────────────────────────────
+
     if first && limit.is_some() {
         bail!("-1/--first and -L/--limit cannot be used together.");
     }
