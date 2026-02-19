@@ -48,22 +48,12 @@ pub fn print_help(config: &LdxConfig) {
     );
     println!();
 
-    // ── Examples ──────────────────────────────────────────────────────────────
-    println!("  {}", "Examples:".bold());
-    let examples: &[(&str, &str)] = &[
-        ("ldx invoice", "substring match in filename"),
-        ("ldx -e rs -d ~/projects -q", "count .rs files in a dir"),
-        ("ldx -o -1 vintagestory", "find and launch a file"),
-        ("ldx -D -w localdex", "find a dir, print cd hint"),
-        (
-            "ldx -e log -L 5 --exclude target,node_modules",
-            "limit results, skip dirs",
-        ),
-    ];
-
-    for (cmd, desc) in examples {
-        println!("    {:<50} {}", cmd.bright_cyan(), desc.dimmed());
-    }
+    // ── Tip ───────────────────────────────────────────────────────────────────
+    println!(
+        "  {}  {}",
+        "Tip:".bold(),
+        "-d = where to search  -D = find dirs  -s = case-sensitive  -S = stats  --edit to customize".dimmed()
+    );
     println!();
 
     // ── Flags ─────────────────────────────────────────────────────────────────
@@ -141,13 +131,6 @@ pub fn print_help(config: &LdxConfig) {
         }
     }
 
-    // ── Tips ──────────────────────────────────────────────────────────────────
-    println!();
-    println!(
-        "  {}  {}",
-        "Tip:".bold(),
-        "-d = where to search  -D = find dirs  -s = case-sensitive  -S = stats  run --edit to customize".dimmed()
-    );
     println!();
 }
 
