@@ -48,25 +48,12 @@ pub fn print_help(config: &LdxConfig) {
     );
     println!();
 
-    // ── Examples ──────────────────────────────────────────────────────────────
-    println!("  {}", "Examples:".bold());
-    let examples: &[(&str, &str)] = &[
-        ("ldx invoice", "substring match on filename"),
-        ("ldx -e pdf -q", "count all .pdf files quietly"),
-        ("ldx -e rs -d ~/projects", "find .rs files in a directory"),
-        ("ldx -a -S -d C:\\", "count every file on C:\\ with stats"),
-        ("ldx vintagestory -o -1", "find and launch a file"),
-        ("ldx localdex -D -w", "find a directory, print cd hint"),
-        ("ldx -e log -L 5", "stop after 5 matches"),
-        (
-            "ldx main.rs --exclude target",
-            "exclude a directory from scan",
-        ),
-    ];
-
-    for (cmd, desc) in examples {
-        println!("    {:<42} {}", cmd.bright_cyan(), desc.dimmed());
-    }
+    // ── Tip (replaces examples — keeps it tight) ─────────────────────────────
+    println!(
+        "  {}  {}",
+        "Tip:".bold(),
+        "-d = where to search  -D = find dirs  -s = case-sensitive  -S = stats  --edit to customize".dimmed()
+    );
     println!();
 
     // ── Flags ─────────────────────────────────────────────────────────────────
@@ -90,14 +77,11 @@ pub fn print_help(config: &LdxConfig) {
 
     // Management flags (not in config)
     let mgmt: &[(&str, &str)] = &[
-        ("--check", "Validate config and print summary"),
-        ("--config", "Print config file location"),
-        ("--edit", "Open config in default editor"),
-        (
-            "--reset",
-            "Restore default flags (preserves aliases & custom)",
-        ),
-        ("--sync", "Add missing default flags to config"),
+        ("--check", "Validate config"),
+        ("--config", "Show config path"),
+        ("--edit", "Open config in editor"),
+        ("--reset", "Restore default flags"),
+        ("--sync", "Add missing default flags"),
         ("--version", "Show version"),
     ];
     println!();
@@ -147,24 +131,5 @@ pub fn print_help(config: &LdxConfig) {
         }
     }
 
-    // ── Tips ──────────────────────────────────────────────────────────────────
-    println!();
-    println!("  {}", "Tips:".bold());
-    println!(
-        "    {}",
-        "-d sets where to search.  -D searches for directories.".dimmed()
-    );
-    println!(
-        "    {}",
-        "-s is case-sensitive.     -S shows stats.".dimmed()
-    );
-    println!(
-        "    {}",
-        "-e pdf matches .pdf files. A bare pattern matches filenames.".dimmed()
-    );
-    println!(
-        "    {}",
-        "Edit config to remap flags, add aliases, or define custom flags.".dimmed()
-    );
     println!();
 }

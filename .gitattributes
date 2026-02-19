@@ -1,0 +1,20 @@
+# Normalize line endings to LF in the repo, convert to CRLF on Windows checkout
+* text=auto
+
+# Force LF for shell scripts regardless of OS
+*.sh text eol=lf
+
+# Force LF for Rust source files
+*.rs text eol=lf
+
+# Force LF for TOML files
+*.toml text eol=lf
+
+# Force LF for Markdown
+*.md text eol=lf
+
+# Binaries — no line ending conversion
+*.exe binary
+*.dll binary
+*.so binary
+*.dylib binary
