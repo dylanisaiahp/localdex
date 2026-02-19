@@ -1,7 +1,7 @@
 # Project Vision: parex / prx / parallax
 
-**Last Updated:** 2026-02-19  
-**Current Version:** v0.0.8 (localdex, pre-rename) ✓ Shipped
+**Last Updated:** 2026-02-19 (v0.1.0)  
+**Current Version:** v0.1.0 (localdex, pre-rename) ✓ Shipped
 
 ---
 
@@ -156,22 +156,21 @@ Accessibility. CSS themes need zero code. Python/JS covers most devs. Rust for p
 - Flag descriptions shortened ✓
 - `install.sh` update detection fixed — now uses tags API ✓
 
-### v0.1.0 Beta (Next — Pre-Separation)
-- Code audit: cut bloat, improve clarity
-  - `flags.rs` — simplify parse_args, reduce duplication
-  - `main.rs` — extract shared single/multi-drive scan logic
-  - `search.rs` — consolidate duplicate match+limit blocks into shared helper
-  - `config.rs`, `display.rs` — already clean, minor polish only
-- Unit tests for core edge cases (flag conflicts, alias expansion, limit behavior)
-- Linux bare-metal benchmarks (CachyOS) — carried from v0.0.8 backlog
-- `cargo clippy` zero warnings maintained throughout
-- Full cross-platform flag test pass (Windows + Linux)
+### v0.1.0 Beta ✓ Shipped
+- `main.rs` — extracted build_matcher, build_search_config, resolve_dir, print_result, print_stats ✓
+- `search.rs` — MatchCtx + handle_match, consolidated duplicate match+limit blocks ✓
+- `flags.rs` — Default trait, flat_map aliases, single-pass validation ✓
+- `config.rs` — removed #[allow(dead_code)], cleaner is_flag_available, descriptions synced ✓
+- `display.rs` — help page trimmed, tip moved to top, print_result/print_stats extracted ✓
+- `install.sh` — update detection fixed (tags API), descriptions synced ✓
+- `cargo clippy` zero warnings ✓
+- Full Windows flag test pass ✓
 
 ### Engine Separation Milestone
 1. Create `parex` repo → extract core, design Query API
-2. Publish `parex` v0.5.0 to crates.io
+2. Publish `parex` v0.1.0 to crates.io
 3. Create `prx` repo → rename localdex, gut engine, depend on `parex` crate
-4. Test, publish `prx` v0.5.0
+4. Test, publish `prx` v0.1.0
 5. Flag architecture refactor (grouped modules: output.rs, search.rs, navigation.rs)
 
 ### Parallax Development

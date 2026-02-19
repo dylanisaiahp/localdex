@@ -4,7 +4,7 @@
 
 **Blazing-fast parallel file search for Windows, Linux, and macOS**
 
-[![Version](https://img.shields.io/badge/version-0.0.8-blue.svg)](https://github.com/dylanisaiahp/localdex)
+[![Version](https://img.shields.io/badge/version-0.1.0-blue.svg)](https://github.com/dylanisaiahp/localdex)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![Built with Rust](https://img.shields.io/badge/built%20with-Rust-orange.svg)](https://www.rust-lang.org/)
 [![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20Linux%20%7C%20macOS-lightgrey.svg)](https://github.com/dylanisaiahp/localdex)
@@ -136,8 +136,8 @@ See [BENCHMARKS.md](BENCHMARKS.md) for full thread scaling tables and Linux vs W
 ### v0.0.8 ✓ Shipped
 Config management (`--check`, `--sync`, `--reset`), dynamic `--help`, Linux benchmarks, scripts reorganized.
 
-### v0.1.0 Beta (next)
-Code audit, unit tests, full cross-platform test pass, Linux bare-metal benchmarks.
+### v0.1.0 Beta ✓ Shipped
+Full code audit, refactored main.rs/search.rs/display.rs/flags.rs/config.rs, help page trimmed, install.sh fixed.
 
 ### Engine Separation
 - `parex` — pure Rust parallel search engine, published to crates.io

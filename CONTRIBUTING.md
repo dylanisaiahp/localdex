@@ -70,7 +70,7 @@ Then open an issue or PR with your CSV files attached. Please include your hardw
 
 Check the [README roadmap](README.md#roadmap) before starting work to avoid duplicating planned features. If you want to work on something not listed, open an issue first to discuss it.
 
-Current focus is **v0.1.0 Beta** — code audit, unit tests, and Linux benchmarks. See the roadmap in README.md for details.
+Current focus is **engine separation** — extracting parex from prx. See the roadmap in README.md for details.
 
 ---
 
@@ -79,7 +79,7 @@ Current focus is **v0.1.0 Beta** — code audit, unit tests, and Linux benchmark
 - Keep PRs focused — one feature or fix per PR
 - Run `cargo clippy` and fix all warnings before submitting
 - Add a clear description of what changed and why
-- If adding a new flag, add it to `DEFAULT_CONFIG` in `main.rs` and update the README flags table
+- If adding a new flag, add it to `DEFAULT_CONFIG` in `config.rs` and update the README flags table
 - If you have benchmark results, include them!
 
 ---
@@ -90,7 +90,8 @@ ldx aims to support Windows, Linux, and macOS. If you're on Linux or macOS, your
 
 **Known platform notes:**
 - Windows: tested on Windows 11, Git Bash required for scripts
-- Linux/macOS: builds and runs but benchmarks not yet collected
+- Linux: tested on CachyOS (Ryzen 7 5825U) — peak 7M entries/s
+- macOS: builds and runs but benchmarks not yet collected
 - HDD benchmarks: cold cache numbers on a full HDD welcome — current HDD data was from a nearly empty drive
 
 ---

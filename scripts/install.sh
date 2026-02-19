@@ -4,7 +4,7 @@
 # Usage: ./install.sh [options]
 #
 # curl install (once releases are available):
-#   curl -sSf https://raw.githubusercontent.com/dylanisaiahp/localdex/main/install.sh | bash
+#   curl -sSf https://raw.githubusercontent.com/dylanisaiahp/localdex/main/scripts/install.sh | bash
 
 set -e
 
@@ -246,7 +246,7 @@ install_from_source() {
     CONFIG_FILE="$DEST/config.toml"
     cat > "$CONFIG_FILE" << 'CONFIGEOF'
 # ═══════════════════════════════════════════════════════════════════════════
-# ldx configuration file (v0.0.5+)
+# ldx configuration file (v0.1.0+)
 # ═══════════════════════════════════════════════════════════════════════════
 # Edit this file to customize flags, create aliases, and define custom commands
 #
@@ -260,7 +260,7 @@ install_from_source() {
 [flags.all-files]
 short = "a"
 long = "all-files"
-description = "Count all files, no filter needed"
+description = "Count all files, no filter"
 os = "all"
 action = "set_boolean"
 target = "all"
@@ -268,7 +268,7 @@ target = "all"
 [flags.all-drives]
 short = "A"
 long = "all-drives"
-description = "Scan all drives with a per-drive breakdown and total"
+description = "Scan all drives with per-drive breakdown"
 os = "windows"
 action = "set_boolean"
 target = "all_drives"
@@ -284,7 +284,7 @@ target = "case_sensitive"
 [flags.dir]
 short = "d"
 long = "dir"
-description = "Directory to search in (default: current)"
+description = "Directory to search (default: current)"
 os = "all"
 action = "set_value"
 target = "dir"
@@ -292,7 +292,7 @@ target = "dir"
 [flags.dirs]
 short = "D"
 long = "dirs"
-description = "Search for directories instead of files"
+description = "Search for directories"
 os = "all"
 action = "set_boolean"
 target = "dirs_only"
@@ -300,7 +300,7 @@ target = "dirs_only"
 [flags.extension]
 short = "e"
 long = "extension"
-description = "Search by file extension (e.g. pdf, rs)"
+description = "Filter by extension (e.g. pdf, rs)"
 os = "all"
 action = "set_value"
 target = "extension"
@@ -308,7 +308,7 @@ target = "extension"
 [flags.first]
 short = "1"
 long = "first"
-description = "Stop after the first match"
+description = "Stop after first match"
 os = "all"
 action = "set_boolean"
 target = "first"
@@ -316,7 +316,7 @@ target = "first"
 [flags.help]
 short = "h"
 long = "help"
-description = "Show this help message"
+description = "Show this help"
 os = "all"
 action = "show_help"
 
@@ -331,7 +331,7 @@ target = "limit"
 [flags.open]
 short = "o"
 long = "open"
-description = "Open or launch the matched file"
+description = "Open the matched file"
 os = "all"
 action = "set_boolean"
 target = "open"
@@ -339,7 +339,7 @@ target = "open"
 [flags.quiet]
 short = "q"
 long = "quiet"
-description = "Suppress per-file output; still prints summary count"
+description = "Suppress output; still prints count"
 os = "all"
 action = "set_boolean"
 target = "quiet"
@@ -355,7 +355,7 @@ target = "stats"
 [flags.threads]
 short = "t"
 long = "threads"
-description = "Number of threads to use (default: all available)"
+description = "Thread count (default: all cores)"
 os = "all"
 action = "set_value"
 target = "threads"
@@ -363,7 +363,7 @@ target = "threads"
 [flags.verbose]
 short = "v"
 long = "verbose"
-description = "Show detailed scan breakdown (files + dirs separately)"
+description = "Verbose stats (files + dirs)"
 os = "all"
 action = "set_boolean"
 target = "verbose"
@@ -371,7 +371,7 @@ target = "verbose"
 [flags.where]
 short = "w"
 long = "where"
-description = "Print the path with cd hint (implies -1)"
+description = "Print path with cd hint"
 os = "all"
 action = "set_boolean"
 target = "where_mode"
@@ -510,7 +510,7 @@ fi
 echo ""
 echo -e "${GREEN}${BOLD}✓ ldx installed successfully!${RESET}"
 echo ""
-echo -e "${CYAN}${BOLD}localdex v0.0.7 installed! 🚀${RESET}"
+echo -e "${CYAN}${BOLD}ldx v0.1.0 installed! 🚀${RESET}"
 echo ""
 echo -e "${BOLD}Quick next steps:${RESET}"
 echo -e "  ${CYAN}ldx --version${RESET}          # confirm install"
