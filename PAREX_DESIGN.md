@@ -64,7 +64,7 @@ pub trait Matcher: Send + Sync {
 }
 ```
 
-prx provides all concrete implementations. Third parties bring their own.
+ldx (localdex repo) provides all concrete implementations. Third parties bring their own.
 
 ---
 
@@ -242,7 +242,7 @@ impl SearchBuilder {
 }
 ```
 
-Usage from prx:
+Usage from ldx:
 ```rust
 let results = parex::search()
     .source(DirectorySource::new("~/projects").exclude(vec!["target"]))
@@ -278,9 +278,9 @@ Sources use this to configure their traversal. `DirectorySource` passes it to th
 
 ---
 
-## prx's Concrete Implementations
+## ldx's Concrete Implementations
 
-These live in `prx`, not `parex`:
+These live in `ldx` (localdex repo), not `parex`:
 
 ```rust
 // DirectorySource — wraps ignore::WalkBuilder
@@ -325,6 +325,18 @@ parex::stop();
 ```
 
 Decision: implement Option A when parallax starts. Parallax may run two searches concurrently (e.g. different scopes), so per-search tokens are the safer choice.
+
+---
+
+## Naming — Final Decisions
+
+| Component | Name | Repo | crates.io |
+|-----------|------|------|-----------|
+| Engine | `parex` | new `parex` repo | ✓ publish |
+| CLI | `ldx` (binary) | `localdex` repo (existing) | ✗ binary only |
+| GUI | `parallax` | new `parallax` repo | ✗ binary only |
+
+`ldx` stays permanent — no rename to `prx` or anything else. Already in users' PATH, already has brand recognition, no conflicts anywhere. The suite doesn't need phonetic consistency (`git`/`GitHub`, `cargo`/`crates.io`).
 
 ---
 
