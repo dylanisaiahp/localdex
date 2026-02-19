@@ -1,7 +1,7 @@
 # Project Vision: parex / prx / parallax
 
-**Last Updated:** 2026-02-18  
-**Current Version:** v0.0.8 (localdex, pre-rename) — in progress
+**Last Updated:** 2026-02-19  
+**Current Version:** v0.0.8 (localdex, pre-rename) ✓ Shipped
 
 ---
 
@@ -17,14 +17,14 @@ Build a blazing-fast parallel search framework (parex) with clean CLI (prx) and 
 - **Not just files:** Can search anything traversable (posts, products, DB records, file systems)
 - **Zero opinions:** No file-system logic in core—that's for wrappers
 - **API design:** Simple Query struct in, Results out (zero overhead)
-- **Launch:** v0.5.0 on crates.io after separation
+- **Launch:** v0.1.0 on crates.io after separation
 
 ### prx (CLI)
 - **What:** File search wrapper around parex
 - **Binary name:** `ldx` (transitional), then `prx`
 - **Note:** No crate conflict on crates.io, but a CLI called PROJAX uses the `prx` command — verify before final rename or keep `ldx` as the permanent binary name
 - **Philosophy:** Config-driven everything, zero hardcoded behavior
-- **Launch:** v0.5.0 after rename from localdex
+- **Launch:** v0.1.0 after rename from localdex
 
 ### parallax (GUI)
 - **What:** Spotlight/Raycast style desktop app (Tauri + Rust)
@@ -73,9 +73,12 @@ The `r` prefix signals "production-ready." Year-based versioning was considered 
 ## Current State (v0.0.8)
 
 **Performance:**
-- Peak: 1,641,700 entries/s @ 16t on 86k files
-- Sustained: 526,404 entries/s @ 10t on 945k files (C:\ drive)
-- 4.8x faster on Linux VM vs Windows (pending CachyOS bare metal benchmarks)
+- Windows peak: 1,641,700 entries/s @ 16t (i5-13400F, C:\Program Files)
+- Windows sustained: 526,404 entries/s @ 10t on 945k files (C:\ drive)
+- Linux peak: 7,065,858 entries/s @ 16t (Ryzen 7 5825U, CachyOS NVMe)
+- Linux sustained: 6,026,774 entries/s @ 16t on home dir
+- Linux cold cache faster than Windows warm cache (56x difference on full drive)
+- Desktop CachyOS benchmarks pending
 
 **Features:**
 - Config-driven flag parsing (users can remap any flag)
@@ -139,13 +142,19 @@ Accessibility. CSS themes need zero code. Python/JS covers most devs. Rust for p
 - `-L` limit race condition fix
 - Version from `env!("CARGO_PKG_VERSION")`
 
-### v0.0.8 ✓ Shipped (Docs & Testing Polish)
-- README.md updated to v0.0.7 feature set ✓
+### v0.0.8 ✓ Shipped
+- README.md updated and trimmed ✓
+- BENCHMARKS.md restructured with real Linux data and comparison tables ✓
+- CONTRIBUTING.md cleaned up, script paths fixed ✓
 - Windows flag test pass — all flags and aliases verified ✓
 - `cargo clippy` + `cargo fmt` clean ✓
 - `bump.sh` version helper script ✓
 - Scripts moved to `scripts/` directory ✓
-- Linux test pass — deferred to v0.1.0 backlog (no Linux machine available)
+- Version strings fixed to use `env!("CARGO_PKG_VERSION")` ✓
+- `.gitattributes` added — LF/CRLF warnings resolved ✓
+- Help page trimmed — examples removed, tip moved to top ✓
+- Flag descriptions shortened ✓
+- `install.sh` update detection fixed — now uses tags API ✓
 
 ### v0.1.0 Beta (Next — Pre-Separation)
 - Code audit: cut bloat, improve clarity
@@ -272,12 +281,22 @@ Solid for v0.0.X experimental with zero promotion. Post to r/rust after r1.0 sta
 - Scripts moved to `scripts/` directory
 - Linux test pass deferred to v0.1.0 (no machine available)
 
+**Completed since last notes:**
+- Linux bare-metal benchmarks on CachyOS (Ryzen 7 5825U) — 7M entries/s peak
+- All docs trimmed and updated with real Linux data
+- `.gitattributes` — LF/CRLF warnings resolved
+- `install.sh` update detection fixed (tags API)
+- Help page trimmed significantly
+- parex/prx launch version corrected to v0.1.0 (not v0.5.0)
+- X post published: linux cold cache faster than Windows warm cache hook
+
 **Next session priorities (v0.1.0 Beta):**
-1. Code audit — start with `flags.rs` and `main.rs`
-2. Extract shared scan logic from `main.rs` all-drives duplication
-3. Unit tests — flag conflict validation, alias expansion, limit clamping
-4. Linux bare-metal benchmarks when CachyOS machine available
-5. Begin engine separation planning (parex Query API design)
+1. Code audit — start with `main.rs` (extract shared scan logic)
+2. `search.rs` — consolidate duplicate match+limit blocks
+3. `flags.rs` — simplify where possible
+4. Add doc comments throughout
+5. Unit tests — flag conflict validation, alias expansion, limit clamping
+6. Begin parex Query API design (universal, source-agnostic)
 
 ---
 

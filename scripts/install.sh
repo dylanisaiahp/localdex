@@ -17,7 +17,7 @@ BOLD='\033[1m'
 RESET='\033[0m'
 
 REPO_URL="https://github.com/dylanisaiahp/localdex"
-REPO_API="https://api.github.com/repos/dylanisaiahp/localdex/releases/latest"
+REPO_API="https://api.github.com/repos/dylanisaiahp/localdex/tags"
 REPO_NAME="dylanisaiahp/localdex"
 
 # ─── Detect OS ────────────────────────────────────────────────────────────────
@@ -92,9 +92,9 @@ echo ""
 # ─── Get latest version from GitHub ──────────────────────────────────────────
 get_latest_version() {
     if command -v curl &> /dev/null; then
-        curl -s "$REPO_API" 2>/dev/null | grep '"tag_name"' | head -1 | grep -oP 'v[\d.]+' | head -1
+        curl -s "$REPO_API" 2>/dev/null | grep '"name"' | head -1 | grep -oP 'v[\d.]+' | head -1
     elif command -v wget &> /dev/null; then
-        wget -qO- "$REPO_API" 2>/dev/null | grep '"tag_name"' | head -1 | grep -oP 'v[\d.]+' | head -1
+        wget -qO- "$REPO_API" 2>/dev/null | grep '"name"' | head -1 | grep -oP 'v[\d.]+' | head -1
     else
         echo ""
     fi
