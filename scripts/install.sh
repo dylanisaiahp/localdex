@@ -4,7 +4,7 @@
 # Usage: ./install.sh [options]
 #
 # curl install (once releases are available):
-#   curl -sSf https://raw.githubusercontent.com/dylanisaiahp/localdex/main/scripts/install.sh | bash
+#   curl -sSf https://raw.githubusercontent.com/dylanisaiahp/localdex/main/install.sh | bash
 
 set -e
 
@@ -51,6 +51,7 @@ FORCE=false
 FROM_SOURCE=false
 FROM_BINARY=false
 KEEP_SOURCE=false
+UNINSTALL=false
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
@@ -66,6 +67,9 @@ while [[ $# -gt 0 ]]; do
         --keep-source)
             KEEP_SOURCE=true
             shift ;;
+        --uninstall)
+            UNINSTALL=true
+            shift ;;
         --help)
             echo "Usage: ./install.sh [options]"
             echo ""
@@ -74,6 +78,7 @@ while [[ $# -gt 0 ]]; do
             echo "  --from-source    Build from source (default)"
             echo "  --binary         Download pre-built binary (when available)"
             echo "  --keep-source    Keep cloned source folder after install"
+            echo "  --uninstall      Uninstall ldx"
             echo "  --help           Show this help message"
             exit 0 ;;
         *)
@@ -82,6 +87,144 @@ while [[ $# -gt 0 ]]; do
             exit 1 ;;
     esac
 done
+
+# ===========================================================================
+# UNINSTALL
+# ===========================================================================
+
+do_uninstall() {
+    echo ""
+    echo -e "${CYAN}${BOLD}🔍 ldx — Uninstaller${RESET}"
+    echo -e "${CYAN}OS: $OS${RESET}"
+    echo ""
+
+    # Check standard locations
+    if [ "$OS" = "windows" ]; then
+        LOCATIONS=("$USERPROFILE/.cargo/bin" "$USERPROFILE/bin" "/c/Program Files/ldx")
+    else
+        LOCATIONS=("$HOME/.cargo/bin" "$HOME/.local/bin" "/usr/local/bin")
+    fi
+
+    FOUND_LOCATION=""
+    for LOC in "${LOCATIONS[@]}"; do
+        if [ -f "$LOC/$BINARY_NAME" ] || [ -f "$LOC/$ALIAS_NAME" ]; then
+            FOUND_LOCATION="$LOC"
+            break
+        fi
+    done
+
+    # Fall back to PATH lookup
+    if [ -z "$FOUND_LOCATION" ] && command -v ldx &> /dev/null; then
+        FOUND_LOCATION=$(dirname "$(command -v ldx)")
+    fi
+
+    if [ -z "$FOUND_LOCATION" ]; then
+        echo -e "${YELLOW}ldx not found — may already be uninstalled.${RESET}"
+        echo ""
+        exit 0
+    fi
+
+    # Show version if available
+    if command -v ldx &> /dev/null; then
+        VERSION=$(ldx --version 2>/dev/null | grep -oP 'v[\d.]+' || echo "")
+        [ -n "$VERSION" ] && echo -e "Found ldx ${BOLD}$VERSION${RESET} at: ${CYAN}$FOUND_LOCATION${RESET}"                           || echo -e "Found ldx at: ${CYAN}$FOUND_LOCATION${RESET}"
+    else
+        echo -e "Found ldx at: ${CYAN}$FOUND_LOCATION${RESET}"
+    fi
+
+    CONFIG_PATH="$FOUND_LOCATION/config.toml"
+    SOURCE_PATH=""
+    [ -f "$CONFIG_PATH" ] && SOURCE_PATH=$(grep "source_path" "$CONFIG_PATH" 2>/dev/null | cut -d'"' -f2)
+    HAS_SOURCE=false
+    [ -n "$SOURCE_PATH" ] && [ -d "$SOURCE_PATH" ] && HAS_SOURCE=true
+
+    echo ""
+    echo -e "${BOLD}What would you like to do?${RESET}"
+    echo ""
+
+    if [ "$HAS_SOURCE" = true ]; then
+        echo -e "  ${CYAN}1)${RESET} Uninstall binaries only (keep source)"
+        echo -e "  ${CYAN}2)${RESET} Uninstall everything (binaries, config, and source)"
+        echo -e "  ${CYAN}3)${RESET} Exit"
+        echo ""
+        read -rp "Choice [1-3] (default: 1): " CHOICE
+        CHOICE=${CHOICE:-1}
+        case "$CHOICE" in
+            1) REMOVE_SOURCE=false ;;
+            2) REMOVE_SOURCE=true ;;
+            3) echo -e "${CYAN}Exiting.${RESET}"; exit 0 ;;
+            *) echo -e "${RED}Invalid choice.${RESET}"; exit 1 ;;
+        esac
+    else
+        echo -e "  ${CYAN}1)${RESET} Uninstall ldx"
+        echo -e "  ${CYAN}2)${RESET} Exit"
+        echo ""
+        read -rp "Choice [1-2] (default: 1): " CHOICE
+        CHOICE=${CHOICE:-1}
+        REMOVE_SOURCE=false
+        case "$CHOICE" in
+            1) ;;
+            2) echo -e "${CYAN}Exiting.${RESET}"; exit 0 ;;
+            *) echo -e "${RED}Invalid choice.${RESET}"; exit 1 ;;
+        esac
+    fi
+
+    echo ""
+    echo -e "${YELLOW}Uninstalling ldx...${RESET}"
+    echo ""
+
+    NEEDS_SUDO=false
+    [ "$FOUND_LOCATION" = "/usr/local/bin" ] && NEEDS_SUDO=true
+
+    if [ "$NEEDS_SUDO" = true ]; then
+        sudo rm -f "$FOUND_LOCATION/$BINARY_NAME" "$FOUND_LOCATION/$ALIAS_NAME"
+    else
+        rm -f "$FOUND_LOCATION/$BINARY_NAME" "$FOUND_LOCATION/$ALIAS_NAME"
+    fi
+    echo -e "${GREEN}✓ Removed binaries from $FOUND_LOCATION${RESET}"
+
+    if [ -f "$CONFIG_PATH" ]; then
+        [ "$NEEDS_SUDO" = true ] && sudo rm -f "$CONFIG_PATH" || rm -f "$CONFIG_PATH"
+        echo -e "${GREEN}✓ Removed config.toml${RESET}"
+    fi
+
+    if [ "$REMOVE_SOURCE" = true ] && [ -d "$SOURCE_PATH" ]; then
+        rm -rf "$SOURCE_PATH"
+        echo -e "${GREEN}✓ Removed source directory${RESET}"
+    fi
+
+    # Clean up PATH entries
+    echo ""
+    echo -e "${YELLOW}Remove PATH entries added by install.sh? [y/N]:${RESET} "
+    read -rp "" REMOVE_PATH
+    if [[ "$REMOVE_PATH" =~ ^[Yy]$ ]]; then
+        if [ "$OS" = "windows" ]; then
+            SHELL_CONFIG="$HOME/.bashrc"
+        elif [ -n "$ZSH_VERSION" ] || [ "$SHELL" = "/bin/zsh" ] || [ "$SHELL" = "/usr/bin/zsh" ]; then
+            SHELL_CONFIG="$HOME/.zshrc"
+        elif [ -n "$BASH_VERSION" ]; then
+            SHELL_CONFIG="$HOME/.bashrc"
+        else
+            SHELL_CONFIG="$HOME/.profile"
+        fi
+        if [ -f "$SHELL_CONFIG" ]; then
+            sed -i.bak '/# ldx/d' "$SHELL_CONFIG"
+            sed -i.bak "\|export PATH=\"\$PATH:$FOUND_LOCATION\"|d" "$SHELL_CONFIG"
+            rm -f "${SHELL_CONFIG}.bak"
+            echo -e "${GREEN}✓ Removed PATH entries from $SHELL_CONFIG${RESET}"
+        fi
+    fi
+
+    echo ""
+    echo -e "${GREEN}${BOLD}✓ ldx uninstalled successfully!${RESET}"
+    echo ""
+}
+
+# ─── Dispatch uninstall before printing installer header ─────────────────────
+if [ "$UNINSTALL" = true ]; then
+    do_uninstall
+    exit 0
+fi
 
 # ─── Header ───────────────────────────────────────────────────────────────────
 echo ""
@@ -246,7 +389,7 @@ install_from_source() {
     CONFIG_FILE="$DEST/config.toml"
     cat > "$CONFIG_FILE" << 'CONFIGEOF'
 # ═══════════════════════════════════════════════════════════════════════════
-# ldx configuration file (v0.1.0+)
+# ldx configuration file (v0.0.5+)
 # ═══════════════════════════════════════════════════════════════════════════
 # Edit this file to customize flags, create aliases, and define custom commands
 #
@@ -260,7 +403,7 @@ install_from_source() {
 [flags.all-files]
 short = "a"
 long = "all-files"
-description = "Count all files, no filter"
+description = "Count all files, no filter needed"
 os = "all"
 action = "set_boolean"
 target = "all"
@@ -268,7 +411,7 @@ target = "all"
 [flags.all-drives]
 short = "A"
 long = "all-drives"
-description = "Scan all drives with per-drive breakdown"
+description = "Scan all drives with a per-drive breakdown and total"
 os = "windows"
 action = "set_boolean"
 target = "all_drives"
@@ -284,7 +427,7 @@ target = "case_sensitive"
 [flags.dir]
 short = "d"
 long = "dir"
-description = "Directory to search (default: current)"
+description = "Directory to search in (default: current)"
 os = "all"
 action = "set_value"
 target = "dir"
@@ -292,7 +435,7 @@ target = "dir"
 [flags.dirs]
 short = "D"
 long = "dirs"
-description = "Search for directories"
+description = "Search for directories instead of files"
 os = "all"
 action = "set_boolean"
 target = "dirs_only"
@@ -300,7 +443,7 @@ target = "dirs_only"
 [flags.extension]
 short = "e"
 long = "extension"
-description = "Filter by extension (e.g. pdf, rs)"
+description = "Search by file extension (e.g. pdf, rs)"
 os = "all"
 action = "set_value"
 target = "extension"
@@ -308,7 +451,7 @@ target = "extension"
 [flags.first]
 short = "1"
 long = "first"
-description = "Stop after first match"
+description = "Stop after the first match"
 os = "all"
 action = "set_boolean"
 target = "first"
@@ -316,7 +459,7 @@ target = "first"
 [flags.help]
 short = "h"
 long = "help"
-description = "Show this help"
+description = "Show this help message"
 os = "all"
 action = "show_help"
 
@@ -331,7 +474,7 @@ target = "limit"
 [flags.open]
 short = "o"
 long = "open"
-description = "Open the matched file"
+description = "Open or launch the matched file"
 os = "all"
 action = "set_boolean"
 target = "open"
@@ -339,7 +482,7 @@ target = "open"
 [flags.quiet]
 short = "q"
 long = "quiet"
-description = "Suppress output; still prints count"
+description = "Suppress per-file output; still prints summary count"
 os = "all"
 action = "set_boolean"
 target = "quiet"
@@ -355,7 +498,7 @@ target = "stats"
 [flags.threads]
 short = "t"
 long = "threads"
-description = "Thread count (default: all cores)"
+description = "Number of threads to use (default: all available)"
 os = "all"
 action = "set_value"
 target = "threads"
@@ -363,7 +506,7 @@ target = "threads"
 [flags.verbose]
 short = "v"
 long = "verbose"
-description = "Verbose stats (files + dirs)"
+description = "Show detailed scan breakdown (files + dirs separately)"
 os = "all"
 action = "set_boolean"
 target = "verbose"
@@ -371,7 +514,7 @@ target = "verbose"
 [flags.where]
 short = "w"
 long = "where"
-description = "Print path with cd hint"
+description = "Print the path with cd hint (implies -1)"
 os = "all"
 action = "set_boolean"
 target = "where_mode"
@@ -454,6 +597,8 @@ install_from_binary() {
     echo ""
     install_from_source
 }
+
+
 
 # ─── Already installed flow ───────────────────────────────────────────────────
 INSTALLED_VERSION=$(get_installed_version)
