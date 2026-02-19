@@ -13,7 +13,7 @@ pub const DEFAULT_CONFIG: &str = r#"
 [flags.all-files]
 short = "a"
 long = "all-files"
-description = "Count all files, no filter needed"
+description = "Count all files, no filter"
 os = "all"
 action = "set_boolean"
 target = "all"
@@ -21,7 +21,7 @@ target = "all"
 [flags.all-drives]
 short = "A"
 long = "all-drives"
-description = "Scan all drives with a per-drive breakdown and total"
+description = "Scan all drives with per-drive breakdown"
 os = "windows"
 action = "set_boolean"
 target = "all_drives"
@@ -37,7 +37,7 @@ target = "case_sensitive"
 [flags.dir]
 short = "d"
 long = "dir"
-description = "Directory to search in (default: current)"
+description = "Directory to search (default: current)"
 os = "all"
 action = "set_value"
 target = "dir"
@@ -45,7 +45,7 @@ target = "dir"
 [flags.dirs]
 short = "D"
 long = "dirs"
-description = "Search for directories instead of files"
+description = "Search for directories"
 os = "all"
 action = "set_boolean"
 target = "dirs_only"
@@ -53,7 +53,7 @@ target = "dirs_only"
 [flags.extension]
 short = "e"
 long = "extension"
-description = "Search by file extension (e.g. pdf, rs)"
+description = "Filter by extension (e.g. pdf, rs)"
 os = "all"
 action = "set_value"
 target = "extension"
@@ -61,7 +61,7 @@ target = "extension"
 [flags.first]
 short = "1"
 long = "first"
-description = "Stop after the first match"
+description = "Stop after first match"
 os = "all"
 action = "set_boolean"
 target = "first"
@@ -69,7 +69,7 @@ target = "first"
 [flags.help]
 short = "h"
 long = "help"
-description = "Show this help message"
+description = "Show this help"
 os = "all"
 action = "show_help"
 target = "help"
@@ -85,7 +85,7 @@ target = "limit"
 [flags.open]
 short = "o"
 long = "open"
-description = "Open or launch the matched file"
+description = "Open the matched file"
 os = "all"
 action = "set_boolean"
 target = "open"
@@ -93,7 +93,7 @@ target = "open"
 [flags.quiet]
 short = "q"
 long = "quiet"
-description = "Suppress per-file output; still prints summary count"
+description = "Suppress output; still prints count"
 os = "all"
 action = "set_boolean"
 target = "quiet"
@@ -109,7 +109,7 @@ target = "stats"
 [flags.threads]
 short = "t"
 long = "threads"
-description = "Number of threads to use (default: all available)"
+description = "Thread count (default: all cores)"
 os = "all"
 action = "set_value"
 target = "threads"
@@ -117,7 +117,7 @@ target = "threads"
 [flags.verbose]
 short = "v"
 long = "verbose"
-description = "Show detailed scan breakdown (files + dirs separately)"
+description = "Verbose stats (files + dirs)"
 os = "all"
 action = "set_boolean"
 target = "verbose"
@@ -125,7 +125,7 @@ target = "verbose"
 [flags.where]
 short = "w"
 long = "where"
-description = "Print the path with cd hint (implies -1)"
+description = "Print path with cd hint"
 os = "all"
 action = "set_boolean"
 target = "where_mode"
@@ -139,7 +139,6 @@ target = "where_mode"
 // Config file structures
 // ---------------------------------------------------------------------------
 
-#[allow(dead_code)]
 #[derive(Debug, Deserialize)]
 pub struct FlagDef {
     pub short: String,
@@ -154,7 +153,6 @@ pub struct FlagDef {
     pub value: Option<String>,
 }
 
-#[allow(dead_code)]
 #[derive(Debug, Deserialize)]
 pub struct LdxConfig {
     #[serde(default)]
@@ -197,16 +195,10 @@ pub fn load_config() -> Result<LdxConfig> {
 }
 
 pub fn is_flag_available(flag: &FlagDef) -> bool {
-    match flag.os.as_str() {
-        "all" => true,
-        #[cfg(windows)]
-        "windows" => true,
-        #[cfg(target_os = "linux")]
-        "linux" => true,
-        #[cfg(target_os = "macos")]
-        "macos" => true,
-        _ => false,
-    }
+    flag.os == "all"
+        || (cfg!(windows) && flag.os == "windows")
+        || (cfg!(target_os = "linux") && flag.os == "linux")
+        || (cfg!(target_os = "macos") && flag.os == "macos")
 }
 
 // ---------------------------------------------------------------------------
