@@ -11,13 +11,100 @@ use std::path::PathBuf;
 use std::time::Instant;
 
 use config::{check_config, config_path, load_config, reset_config, sync_config};
-use display::{fmt_num, print_help};
-use flags::parse_args;
+use display::{fmt_num, print_help, print_result, print_stats};
+use flags::{ParsedFlags, parse_args};
 use launcher::{open_file, prompt_and_open};
-use search::{Config, scan_dir};
+use search::{Config, ScanResult, scan_dir};
 
 #[cfg(windows)]
 use search::get_all_drives;
+
+// ---------------------------------------------------------------------------
+// Build AhoCorasick matcher from parsed flags
+// ---------------------------------------------------------------------------
+
+fn build_matcher(f: &ParsedFlags) -> Result<Option<AhoCorasick>> {
+    if f.all || f.extension.is_some() {
+        return Ok(None);
+    }
+    let pattern = f.pattern.clone().unwrap();
+    Ok(Some(if f.case_sensitive {
+        AhoCorasick::new([&pattern])?
+    } else {
+        AhoCorasickBuilder::new()
+            .ascii_case_insensitive(true)
+            .build([&pattern])?
+    }))
+}
+
+// ---------------------------------------------------------------------------
+// Build search::Config from parsed flags
+// ---------------------------------------------------------------------------
+
+fn build_search_config(
+    f: &ParsedFlags,
+    matcher: Option<AhoCorasick>,
+    collect_paths: bool,
+) -> Config {
+    Config {
+        case_sensitive: f.case_sensitive,
+        quiet: f.quiet,
+        all: f.all,
+        dirs_only: f.dirs_only,
+        extension: f.extension.clone(),
+        matcher,
+        limit: f.limit,
+        threads: f.threads,
+        collect_paths,
+        exclude: f.exclude.clone(),
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Resolve and canonicalize the search directory
+// ---------------------------------------------------------------------------
+
+fn resolve_dir(dir: PathBuf) -> PathBuf {
+    let mut dir = dir;
+
+    if dir.starts_with("~") {
+        if let Some(mut home) = home_dir() {
+            let rest = dir.strip_prefix("~").unwrap();
+            if !rest.as_os_str().is_empty() {
+                home.push(
+                    rest.strip_prefix(std::path::MAIN_SEPARATOR_STR)
+                        .unwrap_or(rest),
+                );
+            }
+            dir = home;
+        } else {
+            eprintln!("~ expansion failed; using literal path.");
+        }
+    }
+
+    #[cfg(windows)]
+    if dir.as_os_str().to_string_lossy().ends_with(':') {
+        dir.push("\\");
+    }
+
+    let dir = std::fs::canonicalize(&dir).unwrap_or(dir);
+
+    #[cfg(windows)]
+    let dir = {
+        let s = dir.to_string_lossy();
+        if let Some(stripped) = s.strip_prefix(r"\\?\") {
+            PathBuf::from(stripped)
+        } else {
+            dir
+        }
+    };
+
+    dir
+}
+
+// ---------------------------------------------------------------------------
+// Main
+// ---------------------------------------------------------------------------
 
 fn main() -> Result<()> {
     let ldx_config = load_config()?;
@@ -75,125 +162,21 @@ fn main() -> Result<()> {
 
     // ── Search ────────────────────────────────────────────────────────────────
 
-    let mut dir = f.dir.clone();
+    let matcher = build_matcher(&f)?;
 
     if !f.all_drives {
-        if dir.starts_with("~") {
-            if let Some(mut home) = home_dir() {
-                let rest = dir.strip_prefix("~").unwrap();
-                if !rest.as_os_str().is_empty() {
-                    home.push(
-                        rest.strip_prefix(std::path::MAIN_SEPARATOR_STR)
-                            .unwrap_or(rest),
-                    );
-                }
-                dir = home;
-            } else {
-                eprintln!("~ expansion failed; using literal path.");
-            }
-        }
-
-        #[cfg(windows)]
-        {
-            if dir.as_os_str().to_string_lossy().ends_with(':') {
-                dir.push("\\");
-            }
-        }
-
-        let dir = std::fs::canonicalize(&dir).unwrap_or(dir);
-
-        #[cfg(windows)]
-        let dir = {
-            let s = dir.to_string_lossy();
-            if let Some(stripped) = s.strip_prefix(r"\\?\") {
-                PathBuf::from(stripped)
-            } else {
-                dir
-            }
-        };
+        let dir = resolve_dir(f.dir.clone());
 
         if !f.quiet {
             println!("Searching in: {}", dir.display());
         }
 
-        let matcher: Option<AhoCorasick> = if !f.all && f.extension.is_none() {
-            let pattern = f.pattern.clone().unwrap();
-            Some(if f.case_sensitive {
-                AhoCorasick::new([&pattern])?
-            } else {
-                AhoCorasickBuilder::new()
-                    .ascii_case_insensitive(true)
-                    .build([&pattern])?
-            })
-        } else {
-            None
-        };
-
-        let config = Config {
-            case_sensitive: f.case_sensitive,
-            quiet: f.quiet,
-            all: f.all,
-            dirs_only: f.dirs_only,
-            extension: f.extension.clone(),
-            matcher,
-            limit: f.limit,
-            threads: f.threads,
-            collect_paths: f.open || f.where_mode,
-            exclude: f.exclude.clone(),
-        };
-
+        let config = build_search_config(&f, matcher, f.open || f.where_mode);
         let result = scan_dir(&dir, &config);
-        let tc = result.files + result.dirs;
-        // Clamp reported matches to limit — the atomic counter can overshoot by a
-        // few in a parallel walk before WalkState::Quit propagates to all threads.
-        let reported_matches = match f.limit {
-            Some(lim) => result.matches.min(lim),
-            None => result.matches,
-        };
+        let reported_matches = clamp_matches(&result, f.limit);
 
-        if f.all {
-            println!(
-                "Found {} file{} in {:.3}s",
-                fmt_num(reported_matches),
-                if reported_matches == 1 { "" } else { "s" },
-                result.duration.as_secs_f64()
-            );
-        } else if f.dirs_only {
-            println!(
-                "Found {} matching director{} in {:.3}s",
-                fmt_num(reported_matches),
-                if reported_matches == 1 { "y" } else { "ies" },
-                result.duration.as_secs_f64()
-            );
-        } else {
-            println!(
-                "Found {} matching file{} in {:.3}s",
-                fmt_num(reported_matches),
-                if reported_matches == 1 { "" } else { "s" },
-                result.duration.as_secs_f64()
-            );
-        }
-
-        if f.stats && result.duration.as_secs_f64() > 0.0 {
-            let s = result.duration.as_secs_f64();
-            if f.verbose {
-                println!(
-                    "Scanned {} entries ({} files + {} dirs) | Speed: {} entries/s | Threads: {}",
-                    fmt_num(tc),
-                    fmt_num(result.files),
-                    fmt_num(result.dirs),
-                    fmt_num((tc as f64 / s) as usize),
-                    f.threads
-                );
-            } else {
-                println!(
-                    "Scanned {} entries | {} entries/s | Threads: {}",
-                    fmt_num(tc),
-                    fmt_num((tc as f64 / s) as usize),
-                    f.threads
-                );
-            }
-        }
+        print_result(&result, reported_matches, &f, "");
+        print_stats(&result, &f, "");
 
         if reported_matches == 0 {
             std::process::exit(1);
@@ -228,33 +211,7 @@ fn main() -> Result<()> {
         #[cfg(windows)]
         {
             let drives = get_all_drives();
-
-            let matcher: Option<AhoCorasick> = if !f.all && f.extension.is_none() {
-                let pattern = f.pattern.clone().unwrap();
-                Some(if f.case_sensitive {
-                    AhoCorasick::new([&pattern])?
-                } else {
-                    AhoCorasickBuilder::new()
-                        .ascii_case_insensitive(true)
-                        .build([&pattern])?
-                })
-            } else {
-                None
-            };
-
-            let config = Config {
-                case_sensitive: f.case_sensitive,
-                quiet: f.quiet,
-                all: f.all,
-                dirs_only: f.dirs_only,
-                extension: f.extension.clone(),
-                matcher,
-                limit: f.limit,
-                threads: f.threads,
-                collect_paths: f.open,
-                exclude: f.exclude.clone(),
-            };
-
+            let config = build_search_config(&f, matcher, f.open);
             let total_start = Instant::now();
             let mut total_matches = 0usize;
             let mut total_files = 0usize;
@@ -264,52 +221,18 @@ fn main() -> Result<()> {
                 if !f.quiet {
                     println!("Searching in: {}", drive.display());
                 }
-
                 let result = scan_dir(drive, &config);
-                let tc = result.files + result.dirs;
-
                 total_matches += result.matches;
                 total_files += result.files;
                 total_dirs += result.dirs;
 
-                if f.all {
-                    println!(
-                        "  Found {} file{} in {:.3}s",
-                        fmt_num(result.matches),
-                        if result.matches == 1 { "" } else { "s" },
-                        result.duration.as_secs_f64()
-                    );
-                } else {
-                    println!(
-                        "  Found {} matching file{} in {:.3}s",
-                        fmt_num(result.matches),
-                        if result.matches == 1 { "" } else { "s" },
-                        result.duration.as_secs_f64()
-                    );
-                }
-
-                if f.stats && result.duration.as_secs_f64() > 0.0 {
-                    let s = result.duration.as_secs_f64();
-                    if f.verbose {
-                        println!(
-                            "  Scanned {} entries ({} files + {} dirs) | Speed: {} entries/s",
-                            fmt_num(tc),
-                            fmt_num(result.files),
-                            fmt_num(result.dirs),
-                            fmt_num((tc as f64 / s) as usize)
-                        );
-                    } else {
-                        println!(
-                            "  Scanned {} entries | {} entries/s",
-                            fmt_num(tc),
-                            fmt_num((tc as f64 / s) as usize)
-                        );
-                    }
-                }
+                print_result(&result, result.matches, &f, "  ");
+                print_stats(&result, &f, "  ");
             }
 
             let total_dur = total_start.elapsed();
             let total_tc = total_files + total_dirs;
+            let s = total_dur.as_secs_f64();
 
             println!();
             if f.all {
@@ -319,7 +242,7 @@ fn main() -> Result<()> {
                     if total_matches == 1 { "" } else { "s" },
                     drives.len(),
                     if drives.len() == 1 { "" } else { "s" },
-                    total_dur.as_secs_f64()
+                    s
                 );
             } else {
                 println!(
@@ -328,12 +251,11 @@ fn main() -> Result<()> {
                     if total_matches == 1 { "" } else { "s" },
                     drives.len(),
                     if drives.len() == 1 { "" } else { "s" },
-                    total_dur.as_secs_f64()
+                    s
                 );
             }
 
-            if f.stats && total_dur.as_secs_f64() > 0.0 {
-                let s = total_dur.as_secs_f64();
+            if f.stats && s > 0.0 {
                 if f.verbose {
                     println!(
                         "Scanned {} entries ({} files + {} dirs) | Speed: {} entries/s | Threads: {}",
@@ -360,4 +282,15 @@ fn main() -> Result<()> {
     }
 
     Ok(())
+}
+
+// ---------------------------------------------------------------------------
+// Clamp reported matches to limit (atomic counter can overshoot)
+// ---------------------------------------------------------------------------
+
+fn clamp_matches(result: &ScanResult, limit: Option<usize>) -> usize {
+    match limit {
+        Some(lim) => result.matches.min(lim),
+        None => result.matches,
+    }
 }

@@ -48,12 +48,22 @@ pub fn print_help(config: &LdxConfig) {
     );
     println!();
 
-    // ── Tip (replaces examples — keeps it tight) ─────────────────────────────
-    println!(
-        "  {}  {}",
-        "Tip:".bold(),
-        "-d = where to search  -D = find dirs  -s = case-sensitive  -S = stats  --edit to customize".dimmed()
-    );
+    // ── Examples ──────────────────────────────────────────────────────────────
+    println!("  {}", "Examples:".bold());
+    let examples: &[(&str, &str)] = &[
+        ("ldx invoice", "substring match in filename"),
+        ("ldx -e rs -d ~/projects -q", "count .rs files in a dir"),
+        ("ldx -o -1 vintagestory", "find and launch a file"),
+        ("ldx -D -w localdex", "find a dir, print cd hint"),
+        (
+            "ldx -e log -L 5 --exclude target,node_modules",
+            "limit results, skip dirs",
+        ),
+    ];
+
+    for (cmd, desc) in examples {
+        println!("    {:<50} {}", cmd.bright_cyan(), desc.dimmed());
+    }
     println!();
 
     // ── Flags ─────────────────────────────────────────────────────────────────
@@ -131,5 +141,84 @@ pub fn print_help(config: &LdxConfig) {
         }
     }
 
+    // ── Tips ──────────────────────────────────────────────────────────────────
     println!();
+    println!(
+        "  {}  {}",
+        "Tip:".bold(),
+        "-d = where to search  -D = find dirs  -s = case-sensitive  -S = stats  run --edit to customize".dimmed()
+    );
+    println!();
+}
+
+// ---------------------------------------------------------------------------
+// Print scan result summary line
+// ---------------------------------------------------------------------------
+
+pub fn print_result(
+    result: &crate::search::ScanResult,
+    reported_matches: usize,
+    f: &crate::flags::ParsedFlags,
+    indent: &str,
+) {
+    if f.all {
+        println!(
+            "{}Found {} file{} in {:.3}s",
+            indent,
+            fmt_num(reported_matches),
+            if reported_matches == 1 { "" } else { "s" },
+            result.duration.as_secs_f64()
+        );
+    } else if f.dirs_only {
+        println!(
+            "{}Found {} matching director{} in {:.3}s",
+            indent,
+            fmt_num(reported_matches),
+            if reported_matches == 1 { "y" } else { "ies" },
+            result.duration.as_secs_f64()
+        );
+    } else {
+        println!(
+            "{}Found {} matching file{} in {:.3}s",
+            indent,
+            fmt_num(reported_matches),
+            if reported_matches == 1 { "" } else { "s" },
+            result.duration.as_secs_f64()
+        );
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Print stats line
+// ---------------------------------------------------------------------------
+
+pub fn print_stats(
+    result: &crate::search::ScanResult,
+    f: &crate::flags::ParsedFlags,
+    indent: &str,
+) {
+    let s = result.duration.as_secs_f64();
+    if !f.stats || s <= 0.0 {
+        return;
+    }
+    let tc = result.files + result.dirs;
+    if f.verbose {
+        println!(
+            "{}Scanned {} entries ({} files + {} dirs) | Speed: {} entries/s | Threads: {}",
+            indent,
+            fmt_num(tc),
+            fmt_num(result.files),
+            fmt_num(result.dirs),
+            fmt_num((tc as f64 / s) as usize),
+            f.threads
+        );
+    } else {
+        println!(
+            "{}Scanned {} entries | {} entries/s | Threads: {}",
+            indent,
+            fmt_num(tc),
+            fmt_num((tc as f64 / s) as usize),
+            f.threads
+        );
+    }
 }
