@@ -1,26 +1,35 @@
 # 📊 ldx Benchmarks
 
-All benchmarks performed on:
+> **entries/s** = filesystem entries (files + directories) scanned per second. Higher is better.
 
-| Component | Spec |
-|-----------|------|
-| **Motherboard** | MSI MS-7D37 |
-| **CPU** | Intel Core i5-13400F (10 physical / 16 logical cores) |
-| **RAM** | 32GB |
-| **GPU** | NVIDIA GeForce RTX 3060 8GB |
-| **OS** | Windows 11 64-bit |
-| **C:** | 500GB SSD (OS drive) |
-| **D:** | 1TB SSD (data drive) |
-
-> All benchmarks are statistically derived from **30 warm runs** (10 + 20) and **20 cold runs** per configuration. Averages and medians reported.
-
-> Want to run your own? Use the included `benchmark.sh` script. Contributions welcome!
+Want to run your own? Use `./scripts/benchmark.sh` — outputs a CSV. Contributions welcome!
 
 ---
 
-## 🧵 Thread Scaling — `C:\` (945k entries, SSD)
+## 🖥️ Windows — i5-13400F, SSD
 
-> The largest and most demanding test — full OS drive scan.
+| Component | Spec |
+|-----------|------|
+| **CPU** | Intel Core i5-13400F (10 physical / 16 logical cores) |
+| **RAM** | 32GB |
+| **OS** | Windows 11 64-bit |
+| **Storage** | 500GB SSD (C:) + 1TB SSD (D:) |
+
+> 30 warm runs + 20 cold runs per configuration.
+
+### Thread Scaling
+
+| Directory | Real-world equivalent | Entries | Sweet spot | Peak speed |
+|-----------|----------------------|---------|------------|------------|
+| `C:\` | Full OS drive | 945k | 10 threads | 526,404/s |
+| `C:\Users\dylan` | Home folder | 520k | 10–12 threads | 752,200/s |
+| `C:\Program Files` | App installs | 86k | 16 threads | 1,641,700/s ✅ |
+| `D:\` | Dev/data drive | 37k | 16 threads | 815,817/s |
+
+<details>
+<summary>Full thread scaling tables</summary>
+
+#### `C:\` (945k entries) — Full OS Drive
 
 | Threads | Warm Avg | Warm Median | Cold Avg | Cold Median |
 |---------|----------|-------------|----------|-------------|
@@ -34,11 +43,7 @@ All benchmarks performed on:
 | 14 | 465,166/s | 467,256/s | 459,313/s | 460,702/s |
 | 16 | 440,848/s | 437,274/s | 431,975/s | 430,744/s |
 
-> **Sweet spot: 10 threads** on full `C:\`. Beyond 10, IO contention hurts performance.
-
----
-
-## 🧵 Thread Scaling — `C:\Users\dylan` (520k entries, SSD)
+#### `C:\Users\dylan` (520k entries) — Home Folder
 
 | Threads | Warm Avg | Warm Median | Cold Avg | Cold Median |
 |---------|----------|-------------|----------|-------------|
@@ -52,11 +57,7 @@ All benchmarks performed on:
 | 14 | 726,490/s | 717,343/s | 699,147/s | 707,634/s |
 | 16 | 685,486/s | 688,550/s | 647,972/s | 636,272/s |
 
-> **Sweet spot: 10–12 threads** on home directory. Warm favors 12, cold favors 10.
-
----
-
-## 🧵 Thread Scaling — `C:\Program Files` (86k entries, SSD)
+#### `C:\Program Files` (86k entries) — App Installs
 
 | Threads | Warm Avg | Warm Median | Cold Avg | Cold Median |
 |---------|----------|-------------|----------|-------------|
@@ -70,11 +71,7 @@ All benchmarks performed on:
 | 14 | 1,553,522/s | 1,567,294/s | 1,573,560/s | 1,583,581/s |
 | **16** | **1,618,843/s** | **1,617,653/s** | **1,641,700/s** | **1,646,164/s** ✅ |
 
-> **Sweet spot: 16 threads** on smaller directories. Small datasets don't saturate IO so more threads always win.
-
----
-
-## 🧵 Thread Scaling — `D:\` (37k entries, SSD)
+#### `D:\` (37k entries) — Dev Drive
 
 | Threads | Warm Avg | Warm Median | Cold Avg | Cold Median |
 |---------|----------|-------------|----------|-------------|
@@ -88,69 +85,28 @@ All benchmarks performed on:
 | 14 | 704,422/s | 720,035/s | 791,790/s | 795,886/s |
 | **16** | **749,385/s** | **744,496/s** | **815,817/s** | **817,494/s** ✅ |
 
-> **Sweet spot: 16 threads** on the smaller data drive. Consistent with the pattern — smaller datasets benefit from more threads.
+</details>
+
+### Cold vs Warm Cache (Windows SSD)
+
+> Cold = first run after reboot. Warm = OS has cached metadata in RAM.
+
+On SSD, cold and warm are nearly identical — NTFS caches metadata aggressively. The real bottleneck on Windows is the filesystem stack, not the drive.
 
 ---
 
-## 💡 Thread Scaling Summary
-
-| Dataset Size | Recommended Threads |
-|---|---|
-| < 100k entries | 16 (more = better) |
-| 100k – 500k entries | 10–12 |
-| 500k+ entries | 10 |
-
-> Use `-t` to benchmark your own system — results vary by CPU, drive speed, and dataset size!
-
----
-
-## 🌡️ Cold vs Warm Cache
-
-> Cold = first run after reboot. Warm = OS has cached directory metadata in RAM.
-
-| Directory | Entries | Cold (10t) | Warm (10t) | Speedup |
-|-----------|---------|------------|------------|---------|
-| `C:\` | 945k | 518,317/s | 526,404/s | ~1x |
-| `C:\Users\dylan` | 520k | 743,145/s | 731,840/s | ~1x |
-| `C:\Program Files` | 86k | 1,372,124/s | 1,336,502/s | ~1x |
-| `D:\` | 37k | 707,140/s | 675,445/s | ~1x |
-
-> On SSD, cold and warm cache performance is nearly identical — the OS caches SSD metadata so efficiently that even "cold" scans are fast.
-
----
-
-## 🏎️ Peak Results
-
-| Scan | Entries | Speed |
-|------|---------|-------|
-| `C:\Program Files` cold, 16t | 86k | **1,641,700/s** 🏆 |
-| `C:\Program Files` warm, 16t | 86k | 1,618,843/s |
-| `D:\` cold, 16t | 37k | 815,817/s |
-| `C:\Users\dylan` cold, 10t | 520k | 743,145/s |
-| `C:\` warm, 10t | 945k | 526,404/s |
-
----
-
-## 🖴 HDD / External Drive Benchmarks
-
-HDD and external drive performance varies significantly based on drive age, fragmentation, and how full the drive is — so we haven't included numbers here. If you have real-world HDD benchmark results, run `benchmark.sh` and open an issue or PR with your CSV!
-
----
-
-## 🐧 Linux Benchmarks — CachyOS (Ryzen 7 5825U, NVMe SSD)
+## 🐧 Linux — Ryzen 7 5825U, CachyOS, NVMe
 
 | Component | Spec |
 |-----------|------|
 | **CPU** | AMD Ryzen 7 5825U (8 cores / 16 threads, mobile) |
 | **RAM** | 16GB |
+| **OS** | CachyOS (BORE scheduler) |
 | **Storage** | NVMe SSD (475GB) |
-| **OS** | CachyOS (Linux, BORE scheduler) |
 
-> All benchmarks are **10 warm runs** per configuration.
+> 10 warm runs per configuration.
 
----
-
-### 🧵 Thread Scaling — `/home/dylan` (106k entries, NVMe)
+### Thread Scaling — `/home/dylan` (106k entries — Home Folder)
 
 | Threads | Warm Avg | Warm Median | Efficiency |
 |---------|----------|-------------|------------|
@@ -164,9 +120,7 @@ HDD and external drive performance varies significantly based on drive age, frag
 | 14 | 5,658,490/s | 5,718,812/s | 41% |
 | **16** | **5,902,959/s** | **6,026,774/s** | 38% ✅ |
 
----
-
-### 🧵 Thread Scaling — `/usr` (NVMe)
+### Thread Scaling — `/usr` (System Dirs)
 
 | Threads | Warm Avg | Warm Median |
 |---------|----------|-------------|
@@ -176,25 +130,41 @@ HDD and external drive performance varies significantly based on drive age, frag
 | 12 | 5,784,335/s | 5,771,879/s |
 | **16** | **6,274,455/s** | **6,211,923/s** ✅ |
 
-> **Peak recorded: 7,065,858 entries/s** @ 16t on `/usr` (single run max)
+> **Peak recorded: 7,065,858 entries/s** @ 16t on `/usr`
 
 ---
 
-### ⚡ Linux vs Windows Comparison
+## ⚡ Linux vs Windows
 
 | Metric | Windows (i5-13400F) | Linux (Ryzen 7 5825U) | Ratio |
 |--------|--------------------|-----------------------|-------|
 | Peak speed | 1,641,700/s | 7,065,858/s | **4.3x** |
-| 16t sustained (home dir) | ~685,000/s | 6,026,774/s | **8.8x** |
+| 16t home dir | ~685,000/s | 6,026,774/s | **8.8x** |
 | Single thread | ~148,000/s | 1,000,164/s | **6.8x** |
-| Cold cache (full drive) | ~94,000/s | 5,272,431/s | **56x** |
+| Cold full drive | ~94,000/s | 5,272,431/s | **56x** |
 
-> Linux cold cache is faster than Windows warm cache. The Windows gap is almost entirely the filesystem stack (NTFS + Defender), not the CPU.
+> Linux cold cache is faster than Windows warm cache. The gap is almost entirely the Windows filesystem stack (NTFS + Defender), not the CPU. These Linux numbers are from a **mobile** chip — desktop results pending.
 
-> These numbers are from a **mobile** Ryzen 7. Desktop CachyOS benchmarks pending.
+---
+
+## 💡 Thread Recommendations
+
+| Dataset | Real-world example | Recommended threads |
+|---------|--------------------|---------------------|
+| < 100k entries | Project folder, app installs | 16 |
+| 100k–500k entries | Home directory | 10–12 |
+| 500k+ entries | Full OS drive | 10 |
+
+> Use `-t N` to set thread count manually and `-S` to see your speed.
+
+---
+
+## 🖴 HDD / External Drives
+
+Performance varies heavily by drive age, fragmentation, and fill level. If you have HDD benchmark results, run `./scripts/benchmark.sh` and open a PR with your CSV!
 
 ---
 
 ## 🍎 macOS Benchmarks
 
-*Contributions welcome! If you run ldx on macOS, please open an issue with your benchmark results.*
+*Coming soon — contributions welcome! Run `./scripts/benchmark.sh` and open an issue with your results.*
