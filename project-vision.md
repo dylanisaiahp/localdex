@@ -1,12 +1,12 @@
-# Project Vision: parex / prx / parallax
+# Project Vision: parex / ldx / parallax
 
-**Last Updated:** 2026-02-19  
-**Current Version:** v0.0.8 (localdex, pre-rename) ✓ Shipped
+**Last Updated:** 2026-02-21  
+**Current Version:** v0.2.0 (ldx on parex engine) ✓ Shipped
 
 ---
 
 ## Core Mission
-Build a blazing-fast parallel search framework (parex) with clean CLI (prx) and Spotlight-style GUI (parallax) wrappers. This is NOT about beating competitors—it's about creating perfectly tailored tools with complete control, config-driven everything, and benchmark-obsessed performance tuning.
+Build a blazing-fast parallel search framework (parex) with a clean CLI (ldx) and Spotlight-style GUI (parallax) wrappers. This is NOT about beating competitors — it's about creating perfectly tailored tools with complete control, config-driven everything, and benchmark-obsessed performance tuning.
 
 ---
 
@@ -15,25 +15,25 @@ Build a blazing-fast parallel search framework (parex) with clean CLI (prx) and 
 ### parex (the engine)
 - **What:** Pure Rust parallel search framework, generic and embeddable
 - **Not just files:** Can search anything traversable (posts, products, DB records, file systems)
-- **Zero opinions:** No file-system logic in core—that's for wrappers
-- **API design:** Simple Query struct in, Results out (zero overhead)
-- **Launch:** v0.1.0 on crates.io after separation
+- **Zero opinions:** No file-system logic in core — that's for wrappers
+- **API:** `Source` + `Matcher` traits, `SearchBuilder` fluent API
+- **Status:** v0.1.0 published to crates.io ✓
 
 ### ldx (CLI)
-- **What:** File search wrapper around parex
+- **What:** File search CLI built on parex
 - **Binary name:** `ldx` — permanent, no rename
 - **Repo:** `localdex` (existing) — no repo rename needed
 - **crates.io:** Not published — binary only, installed via install.sh
 - **Philosophy:** Config-driven everything, zero hardcoded behavior
-- **Launch:** v0.2.0 (first version running on parex engine)
+- **Status:** v0.2.0 — first version running on parex engine ✓
 
 ### parallax (GUI)
 - **What:** Spotlight/Raycast style desktop app (Tauri + Rust)
 - **UX:** Borderless, dynamic height, real-time streaming results (NO loading spinners)
-- **UX note:** Consider a ~50ms debounce/throttle on first keystrokes when cold to avoid flicker on slow drives
-- **Scope:** $HOME by default (not full drives—speed over completeness)
+- **UX note:** ~50ms debounce on first keystrokes when cold to avoid flicker on slow drives
+- **Scope:** $HOME by default (not full drives — speed over completeness)
 - **Plugins:** 5-tier system (CSS themes → Lua → JS → Python/compiled → Rust)
-- **Launch:** After parex/prx stable
+- **Status:** Mockup complete, development pending parex/ldx stable
 
 ### parafetch (future)
 - **What:** neofetch/fastfetch alternative using parex for file counts
@@ -47,11 +47,11 @@ Build a blazing-fast parallel search framework (parex) with clean CLI (prx) and 
 
 ## Naming — Final Decisions
 
-- **parex** = parallel executor/explorer — crates.io library (available ✓)
-- **ldx** = CLI binary — permanent name, localdex repo stays as-is
+- **parex** = parallel executor/explorer — crates.io library ✓
+- **ldx** = CLI binary — permanent name, localdex repo stays as-is ✓
 - **parallax** = GUI — new repo when the time comes
 
-No CLI rename. `ldx` is already in users' PATH, has brand recognition, and conflicts with nothing. The suite doesn't need phonetic consistency.
+No CLI rename. `ldx` is already in users' PATH, has brand recognition, and conflicts with nothing.
 
 ---
 
@@ -59,47 +59,43 @@ No CLI rename. `ldx` is already in users' PATH, has brand recognition, and confl
 
 ```
 0.0.X  → experimental (wild iteration)
-0.X.X  → beta (code polish, separation prep, GUI design)
+0.X.X  → beta (polish, engine integration, GUI design)
 r1.0   → stable release (battle-tested)
 r1.X   → refinements
 r2.0   → major leap (breakthroughs in speed/features)
 ```
 
-The `r` prefix signals "production-ready." Year-based versioning was considered but rejected—too complex for minimal benefit.
+The `r` prefix signals "production-ready."
 
 ---
 
-## Current State (v0.0.8)
+## Current State (v0.2.0)
 
-**Performance:**
-- Windows peak: 1,641,700 entries/s @ 16t (i5-13400F, C:\Program Files)
-- Windows sustained: 526,404 entries/s @ 10t on 945k files (C:\ drive)
-- Linux peak: 7,065,858 entries/s @ 16t (Ryzen 7 5825U, CachyOS NVMe)
-- Linux sustained: 6,026,774 entries/s @ 16t on home dir
-- Linux cold cache faster than Windows warm cache (56x difference on full drive)
-- Desktop CachyOS benchmarks pending
+**Performance (i5-13400F, Windows 11, warm cache, 20 runs):**
+- C:\Program Files (97k entries): **1,491,712 entries/s** @ t=16
+- C:\Users\dylan (40k entries): **733,677 entries/s** @ t=12
+- D:\ (40k entries): **702,785 entries/s** @ t=16
+- C:\ (954k entries): **490,109 entries/s** @ t=12
+
+**Architecture:**
+- parex v0.1.0 published to crates.io ✓
+- `DirectorySource` implements `parex::Source` using `ignore` crate parallel walker
+- `search.rs` gutted — thin wrapper around `parex::search()` with ldx-specific matchers
+- `config.rs` split → `config.rs` + `config_check.rs`
+- `DEFAULT_CONFIG` extracted to `default_config.toml` + `include_str!`
+- `flags.rs` refactored — `parse_args` split into focused helpers
+- `install.sh` generates `config.toml` from `default_config.toml`
+- `dev.sh benchmark` outputs `.md` report, `--live` table, `--csv` raw data
+- Dropped deps: `aho-corasick`, `num_cpus`
 
 **Features:**
 - Config-driven flag parsing (users can remap any flag)
-- Aliases (e.g., `repo = "localdex -D -d D: -1 -S -w -q"`)
-- Custom flags (e.g., `-P` → auto-expand to `-e pdf`)
+- Aliases (e.g., `ct = "-a -A -S -q --verbose"`)
+- Custom flags (e.g., `-R` → auto-expand to `-e rs`)
 - Management flags: `--config`, `--edit`, `--exclude`, `--check`, `--sync`, `--reset`
 - Dynamic `--help` showing user's aliases and custom flags
-- Version sourced from `Cargo.toml` via `env!("CARGO_PKG_VERSION")`
-- `-L` limit race condition fixed (clamped reported count, early-exit guard)
-- Cross-platform installer/uninstaller with source cleanup options
-- Modular codebase: config.rs, flags.rs, search.rs, display.rs, launcher.rs, main.rs
-
-**What works:**
-- File and directory search with substring/extension matching
 - Multi-drive scanning (Windows)
-- Thread scaling with auto-cap at logical cores
-- Real-time result streaming with `-1`/`-L` limits
-- `-w/--where` with cd hints
-- `-o/--open` with picker for multiple results
-- `--check` validates config, catches duplicate flags and missing targets
-- `--sync` adds missing default flags without touching user aliases/custom flags
-- `--reset` restores default flags, preserves `[aliases]`, `[custom]`, `[meta]`
+- Thread scaling with auto-cap at logical cores via `std::thread::available_parallelism`
 
 ---
 
@@ -109,107 +105,93 @@ The `r` prefix signals "production-ready." Year-based versioning was considered 
 Speed, safety, embeddability. Perfect for both CLI and native library for Tauri/mobile.
 
 ### Why NOT indexing/MFT?
-Real-time search fits the "instant discovery" UX better than stale indexes. Parallax searches on every keystroke—no waiting.
+Real-time search fits the "instant discovery" UX better than stale indexes. Parallax searches on every keystroke — no waiting.
 
 ### Why config.toml over hardcoded flags?
-Full user control. Want `-a` to mean something else? Change it. Want `pdf` as an alias? Add it. The binary is just a config executor.
+Full user control. Want `-a` to mean something else? Change it. The binary is just a config executor.
 
-### Why drop pico_args?
-Smaller binary, zero parsing overhead, full control over dynamic flag names from config.
-
-### Why separate parex from prx?
-- Third parties can embed parex for non-file use cases (e.g., X searching millions of posts)
+### Why separate parex from ldx?
+- Third parties can embed parex for non-file use cases
 - Clean API surface, no file-system assumptions in core
 - GUI and CLI share one engine, no duplicate logic
 
 ### Why Tauri over Electron?
-Smaller binaries, native performance, Rust backend integration. No bloated Chromium runtime.
+Smaller binaries, native performance, Rust backend integration.
 
 ### Why NOT Lua-only plugins?
-Accessibility. CSS themes need zero code. Python/JS covers most devs. Rust for power users. Tiered system = broader adoption.
+Accessibility. CSS themes need zero code. Python/JS covers most devs. Rust for power users.
 
 ---
 
 ## Roadmap
 
 ### v0.0.7 ✓ Shipped
-- `--check` (validate config, print summary)
-- `--sync` (merge new default flags without overwriting user customizations)
-- `--reset` (factory reset config, preserve aliases/custom)
-- Dynamic `--help` showing user's aliases/custom flags
-- Nicer help layout (Management section, Tips, column-aligned flags)
+- `--check`, `--sync`, `--reset` management commands
+- Dynamic `--help` with user aliases
 - `-L` limit race condition fix
-- Version from `env!("CARGO_PKG_VERSION")`
 
 ### v0.0.8 ✓ Shipped
-- README.md updated and trimmed ✓
-- BENCHMARKS.md restructured with real Linux data and comparison tables ✓
-- CONTRIBUTING.md cleaned up, script paths fixed ✓
-- Windows flag test pass — all flags and aliases verified ✓
-- `cargo clippy` + `cargo fmt` clean ✓
-- `bump.sh` version helper script ✓
-- Scripts moved to `scripts/` directory ✓
-- Version strings fixed to use `env!("CARGO_PKG_VERSION")` ✓
-- `.gitattributes` added — LF/CRLF warnings resolved ✓
-- Help page trimmed — examples removed, tip moved to top ✓
-- Flag descriptions shortened ✓
-- `install.sh` update detection fixed — now uses tags API ✓
+- README, BENCHMARKS.md, CONTRIBUTING.md updated
+- Scripts moved to `scripts/`, `bump.sh` added
+- Windows flag test pass, clippy clean
 
-### v0.1.0 Beta (Next — Pre-Separation)
-- Code audit: cut bloat, improve clarity
-  - `flags.rs` — simplify parse_args, reduce duplication
-  - `main.rs` — extract shared single/multi-drive scan logic
-  - `search.rs` — consolidate duplicate match+limit blocks into shared helper
-  - `config.rs`, `display.rs` — already clean, minor polish only
-- Unit tests for core edge cases (flag conflicts, alias expansion, limit behavior)
-- Linux bare-metal benchmarks (CachyOS) — carried from v0.0.8 backlog
-- `cargo clippy` zero warnings maintained throughout
-- Full cross-platform flag test pass (Windows + Linux)
+### v0.1.0 ✓ Shipped
+- Full code audit — `flags.rs`, `main.rs`, `search.rs`, `config.rs`, `display.rs`
+- Scripts consolidated: `benchmark.sh`, `build.sh`, `bump.sh` → `dev.sh`
+- `uninstall.sh` absorbed into `install.sh --uninstall`
+- ROADMAP/CHANGELOG split into separate files
 
-### Engine Separation Milestone
-1. Create `parex` repo → extract core, design Query API
-2. Publish `parex` v0.5.0 to crates.io
-3. Create `prx` repo → rename localdex, gut engine, depend on `parex` crate
-4. Test, publish `prx` v0.5.0
-5. Flag architecture refactor (grouped modules: output.rs, search.rs, navigation.rs)
+### v0.2.0 ✓ Shipped
+- parex v0.1.0 published to crates.io
+- `DirectorySource` + parex integration
+- `config.rs` split, `default_config.toml` extracted
+- `flags.rs` refactored into focused helpers
+- `install.sh` generates config from file
+- `dev.sh benchmark` outputs `.md`, `--live`, `--csv`
+- Dropped `aho-corasick`, `num_cpus`
+- Parallax UI mockup complete (aesthetic + advanced modes)
 
-### Parallax Development
-1. Tauri setup, borderless window prototype
-2. Real-time search integration with parex
-3. Settings panel (threads, scope, theme)
-4. Plugin system groundwork (Tier 1: CSS themes)
-5. Auto-benchmark on first launch → persist optimal config
-6. Progressive plugin tiers (Lua → JS → Python → Rust)
-7. Theme marketplace (GitHub repo, community submissions)
+### v0.3.0 — Test Suite (Next)
+- Unit tests for `flags.rs` — alias expansion, custom flag resolution, validation combos
+- Unit tests for `config.rs` — load, `is_flag_available`, path resolution
+- Integration tests — full search round-trips using `DirectorySource`
+- `benches/` with Criterion in parex — baseline throughput measurements
+- parex: `collect_errors` stress test with permission-denied directories
+
+### v0.4.0 — parex v0.2.0
+- True parallel matching — engine distributes match work across threads
+- `--stale N` metadata filter — modified > N days ago, cheap pre-filter
+- Async source support — `AsyncSource` trait for non-blocking IO
+- parex v0.2.0 published to crates.io
+
+### parallax — Future
+- Tauri setup, borderless window prototype
+- Real-time search integration with parex
+- Settings panel (threads, scope, theme)
+- Plugin system groundwork (Tier 1: CSS themes)
+- Auto-benchmark on first launch → persist optimal config
+- Progressive plugin tiers (Lua → JS → Python → Rust)
 
 ---
 
 ## Plugin System Architecture
 
 ### Tier 1 — Themes (CSS/JSON)
-- Zero code, just config files
-- Catppuccin, Nord, Dracula, Tokyo Night, Gruvbox
-- Drop in `~/.config/parallax/themes/`
+Zero code, just config files. Catppuccin, Nord, Dracula, Tokyo Night, Gruvbox.
 
 ### Tier 2 — Lightweight Scripts (Lua)
-- Simple data enrichment
-- CLI command triggers (`!`, `:`, `>`, `?`)
-- ~200KB runtime, super fast
+Simple data enrichment, CLI command triggers (`!`, `:`, `>`, `?`). ~200KB runtime.
 
 ### Tier 3 — Web Dev Friendly (JS/TS via Deno)
-- Familiar to most devs
-- Moderate complexity plugins
+Familiar to most devs, moderate complexity plugins.
 
-### Tier 4 — Power Integrations (Python/Go/C#/Java via WASM or native)
-- External API calls (Steam, VirusTotal)
-- Heavy processing
+### Tier 4 — Power Integrations (Python/Go/C# via WASM or native)
+External API calls (Steam, VirusTotal), heavy processing.
 
 ### Tier 5 — Full System Access (Rust)
-- Replace backend parex if desired
-- Deepest API access
-- Experienced devs only
+Replace backend parex if desired. Deepest API access.
 
-**Plugin priorities:** Weighting system so heavy plugins (VirusTotal scan) don't block light ones (theme preview). UI shows "heavy plugin active" badge during execution.
+**Plugin priorities:** Weighting system so heavy plugins don't block light ones. UI shows "heavy plugin active" badge during execution.
 
 ---
 
@@ -218,87 +200,22 @@ Accessibility. CSS themes need zero code. Python/JS covers most devs. Rust for p
 - **No pre-indexing:** Real-time > stale indexes
 - **No MFT reading on Windows:** Parallel traversal is fast enough, simpler code
 - **No website (initially):** GitHub handles docs/downloads for free
-- **No marketing:** Let quality speak. If it's good, people will find it.
-- **Not trying to beat neofetch/ripgrep/fd/fzf:** This is for personal use first. Others benefit if they want.
-
----
-
-## Why NOT X?
-
-### GSX/ASX specialized tools?
-Unnecessary. parex already does universal parallel search. One tool, any data source.
-
-### `--goto` flag?
-Shell limitation. Child process can't `cd` the parent. Use `-w/--where` + manual cd instead.
-
-### Year-based versioning (v26.X)?
-Too complex, minimal benefit. Clean semantic versioning is simpler and familiar.
-
----
-
-## Mobile Vision (Distant Future)
-
-- **Enscribe mobile:** Cross-platform notes app companion
-- **File browser:** parex-powered Android/iOS file search
-- **Technology:** React Native or Flutter with parex compiled as native library
-
-Not a priority until parex/prx/parallax/parafetch are stable.
-
----
-
-## Community Adoption
-
-**Current traction (14 days, pre-marketing):**
-- 54 clones, 37 unique users
-- 8 views, 5 unique visitors
-
-Solid for v0.0.X experimental with zero promotion. Post to r/rust after r1.0 stable.
-
----
-
-## Current Challenges
-
-- **Testing rigor:** Need comprehensive flag testing before each release (v0.0.5 shipped with broken `--help`, v0.0.7 caught `-L` race condition in testing)
-- **Documentation debt:** Need parex API docs, plugin dev guides, theme creation tutorials
-- **parex API design:** Resolved — see PAREX_DESIGN.md in repo root
+- **No marketing:** Let quality speak
+- **Not trying to beat ripgrep/fd/fzf:** Personal use first
 
 ---
 
 ## Session Notes
 
-**What works amazingly (v0.0.7):**
-- All three management commands (`--check`, `--sync`, `--reset`) tested and working
-- `--sync` duplicate-key bug caught and fixed in testing (key-name check added)
-- `-L` limit race condition identified and fixed before shipping
-- Dynamic `--help` showing aliases cleanly
-- `env!("CARGO_PKG_VERSION")` — Cargo.toml is now single source of truth for version
+**v0.2.0 session (2026-02-21):**
+- parex designed, built, tested, published to crates.io in one day
+- `DirectorySource` using `build_parallel()` + `mpsc::channel` for true parallel streaming
+- Initial `build()` attempt was ~4x slower — caught and fixed before shipping
+- Peak: 1,491,712 entries/s on C:\Program Files @ t=16 (warm, 20 runs)
+- Parallax mockup committed to localdex repo — dual mode (aesthetic + advanced)
+- Accessibility-first design: Atkinson Hyperlegible, color accent picker, calm animations
+- `dev.sh benchmark` overhauled — `.md` output by default, `--live` flag for real-time table
 
-**Completed in v0.0.8:**
-- README, vision, and scripts all updated
-- `bump.sh` built, tested, and working
-- Windows flag test pass clean
-- Scripts moved to `scripts/` directory
-- Linux test pass deferred to v0.1.0 (no machine available)
-
-**Completed since last notes:**
-- Linux bare-metal benchmarks on CachyOS (Ryzen 7 5825U) — 7M entries/s peak
-- All docs trimmed and updated with real Linux data
-- `.gitattributes` — LF/CRLF warnings resolved
-- `install.sh` update detection fixed (tags API)
-- Help page trimmed significantly
-- parex/prx launch version corrected to v0.1.0 (not v0.5.0)
-- X post published: linux cold cache faster than Windows warm cache hook
-
-**Next session priorities (v0.1.0 Beta):**
-1. Code audit — start with `main.rs` (extract shared scan logic)
-2. `search.rs` — consolidate duplicate match+limit blocks
-3. `flags.rs` — simplify where possible
-4. Add doc comments throughout
-5. Unit tests — flag conflict validation, alias expansion, limit clamping
-6. Begin parex Query API design (universal, source-agnostic)
-
----
-
-**End Vision:** A suite of tools so fast, so clean, so configurable that they become daily drivers—not because they beat the competition, but because they're exactly what we need.
+**End Vision:** A suite of tools so fast, so clean, so configurable that they become daily drivers — not because they beat the competition, but because they're exactly what we need.
 
 🦀

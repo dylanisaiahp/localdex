@@ -1,10 +1,11 @@
 mod config;
+mod config_check;
 mod display;
 mod flags;
 mod launcher;
 mod search;
+mod source;
 
-use aho_corasick::{AhoCorasick, AhoCorasickBuilder};
 use anyhow::Result;
 use dirs::home_dir;
 use std::path::PathBuf;
@@ -17,42 +18,20 @@ use launcher::{open_file, prompt_and_open};
 use search::{Config, ScanResult, scan_dir};
 
 #[cfg(windows)]
-use search::get_all_drives;
-
-// ---------------------------------------------------------------------------
-// Build AhoCorasick matcher from parsed flags
-// ---------------------------------------------------------------------------
-
-fn build_matcher(f: &ParsedFlags) -> Result<Option<AhoCorasick>> {
-    if f.all || f.extension.is_some() {
-        return Ok(None);
-    }
-    let pattern = f.pattern.clone().unwrap();
-    Ok(Some(if f.case_sensitive {
-        AhoCorasick::new([&pattern])?
-    } else {
-        AhoCorasickBuilder::new()
-            .ascii_case_insensitive(true)
-            .build([&pattern])?
-    }))
-}
+use source::get_all_drives;
 
 // ---------------------------------------------------------------------------
 // Build search::Config from parsed flags
 // ---------------------------------------------------------------------------
 
-fn build_search_config(
-    f: &ParsedFlags,
-    matcher: Option<AhoCorasick>,
-    collect_paths: bool,
-) -> Config {
+fn build_search_config(f: &ParsedFlags, collect_paths: bool) -> Config {
     Config {
         case_sensitive: f.case_sensitive,
         quiet: f.quiet,
         all: f.all,
         dirs_only: f.dirs_only,
         extension: f.extension.clone(),
-        matcher,
+        pattern: f.pattern.clone(),
         limit: f.limit,
         threads: f.threads,
         collect_paths,
@@ -162,8 +141,6 @@ fn main() -> Result<()> {
 
     // ── Search ────────────────────────────────────────────────────────────────
 
-    let matcher = build_matcher(&f)?;
-
     if !f.all_drives {
         let dir = resolve_dir(f.dir.clone());
 
@@ -171,7 +148,7 @@ fn main() -> Result<()> {
             println!("Searching in: {}", dir.display());
         }
 
-        let config = build_search_config(&f, matcher, f.open || f.where_mode);
+        let config = build_search_config(&f, f.open || f.where_mode);
         let result = scan_dir(&dir, &config);
         let reported_matches = clamp_matches(&result, f.limit);
 
@@ -211,7 +188,7 @@ fn main() -> Result<()> {
         #[cfg(windows)]
         {
             let drives = get_all_drives();
-            let config = build_search_config(&f, matcher, f.open);
+            let config = build_search_config(&f, f.open);
             let total_start = Instant::now();
             let mut total_matches = 0usize;
             let mut total_files = 0usize;
@@ -285,7 +262,7 @@ fn main() -> Result<()> {
 }
 
 // ---------------------------------------------------------------------------
-// Clamp reported matches to limit (atomic counter can overshoot)
+// Clamp reported matches to limit
 // ---------------------------------------------------------------------------
 
 fn clamp_matches(result: &ScanResult, limit: Option<usize>) -> usize {

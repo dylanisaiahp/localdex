@@ -18,15 +18,14 @@ RESET='\033[0m'
 
 REPO_URL="https://github.com/dylanisaiahp/localdex"
 REPO_API="https://api.github.com/repos/dylanisaiahp/localdex/tags"
-REPO_NAME="dylanisaiahp/localdex"
 
 # ─── Detect OS ────────────────────────────────────────────────────────────────
 detect_os() {
     case "$(uname -s)" in
-        Linux*)   echo "linux" ;;
-        Darwin*)  echo "macos" ;;
+        Linux*)            echo "linux" ;;
+        Darwin*)           echo "macos" ;;
         MINGW*|MSYS*|CYGWIN*) echo "windows" ;;
-        *)        echo "unknown" ;;
+        *)                 echo "unknown" ;;
     esac
 }
 
@@ -50,26 +49,14 @@ fi
 FORCE=false
 FROM_SOURCE=false
 FROM_BINARY=false
-KEEP_SOURCE=false
 UNINSTALL=false
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
-        --force)
-            FORCE=true
-            shift ;;
-        --from-source)
-            FROM_SOURCE=true
-            shift ;;
-        --binary)
-            FROM_BINARY=true
-            shift ;;
-        --keep-source)
-            KEEP_SOURCE=true
-            shift ;;
-        --uninstall)
-            UNINSTALL=true
-            shift ;;
+        --force)       FORCE=true;       shift ;;
+        --from-source) FROM_SOURCE=true; shift ;;
+        --binary)      FROM_BINARY=true; shift ;;
+        --uninstall)   UNINSTALL=true;   shift ;;
         --help)
             echo "Usage: ./install.sh [options]"
             echo ""
@@ -77,7 +64,6 @@ while [[ $# -gt 0 ]]; do
             echo "  --force          Force reinstall even if up to date"
             echo "  --from-source    Build from source (default)"
             echo "  --binary         Download pre-built binary (when available)"
-            echo "  --keep-source    Keep cloned source folder after install"
             echo "  --uninstall      Uninstall ldx"
             echo "  --help           Show this help message"
             exit 0 ;;
@@ -98,7 +84,6 @@ do_uninstall() {
     echo -e "${CYAN}OS: $OS${RESET}"
     echo ""
 
-    # Check standard locations
     if [ "$OS" = "windows" ]; then
         LOCATIONS=("$USERPROFILE/.cargo/bin" "$USERPROFILE/bin" "/c/Program Files/ldx")
     else
@@ -113,7 +98,6 @@ do_uninstall() {
         fi
     done
 
-    # Fall back to PATH lookup
     if [ -z "$FOUND_LOCATION" ] && command -v ldx &> /dev/null; then
         FOUND_LOCATION=$(dirname "$(command -v ldx)")
     fi
@@ -124,10 +108,11 @@ do_uninstall() {
         exit 0
     fi
 
-    # Show version if available
     if command -v ldx &> /dev/null; then
         VERSION=$(ldx --version 2>/dev/null | grep -oP 'v[\d.]+' || echo "")
-        [ -n "$VERSION" ] && echo -e "Found ldx ${BOLD}$VERSION${RESET} at: ${CYAN}$FOUND_LOCATION${RESET}"                           || echo -e "Found ldx at: ${CYAN}$FOUND_LOCATION${RESET}"
+        [ -n "$VERSION" ] \
+            && echo -e "Found ldx ${BOLD}$VERSION${RESET} at: ${CYAN}$FOUND_LOCATION${RESET}" \
+            || echo -e "Found ldx at: ${CYAN}$FOUND_LOCATION${RESET}"
     else
         echo -e "Found ldx at: ${CYAN}$FOUND_LOCATION${RESET}"
     fi
@@ -193,7 +178,6 @@ do_uninstall() {
         echo -e "${GREEN}✓ Removed source directory${RESET}"
     fi
 
-    # Clean up PATH entries
     echo ""
     echo -e "${YELLOW}Remove PATH entries added by install.sh? [y/N]:${RESET} "
     read -rp "" REMOVE_PATH
@@ -209,7 +193,7 @@ do_uninstall() {
         fi
         if [ -f "$SHELL_CONFIG" ]; then
             sed -i.bak '/# ldx/d' "$SHELL_CONFIG"
-            sed -i.bak "\|export PATH=\"\$PATH:$FOUND_LOCATION\"|d" "$SHELL_CONFIG"
+            sed -i.bak "s|export PATH=\"\$PATH:$FOUND_LOCATION\"||" "$SHELL_CONFIG"
             rm -f "${SHELL_CONFIG}.bak"
             echo -e "${GREEN}✓ Removed PATH entries from $SHELL_CONFIG${RESET}"
         fi
@@ -220,7 +204,6 @@ do_uninstall() {
     echo ""
 }
 
-# ─── Dispatch uninstall before printing installer header ─────────────────────
 if [ "$UNINSTALL" = true ]; then
     do_uninstall
     exit 0
@@ -232,7 +215,7 @@ echo -e "${CYAN}${BOLD}🔍 ldx — Installer${RESET}"
 echo -e "${CYAN}OS: $OS${RESET}"
 echo ""
 
-# ─── Get latest version from GitHub ──────────────────────────────────────────
+# ─── Version helpers ──────────────────────────────────────────────────────────
 get_latest_version() {
     if command -v curl &> /dev/null; then
         curl -s "$REPO_API" 2>/dev/null | grep '"name"' | head -1 | grep -oP 'v[\d.]+' | head -1
@@ -243,7 +226,6 @@ get_latest_version() {
     fi
 }
 
-# ─── Get installed version ────────────────────────────────────────────────────
 get_installed_version() {
     if command -v ldx &> /dev/null; then
         ldx --version 2>/dev/null | grep -oP 'v[\d.]+' | head -1
@@ -252,7 +234,6 @@ get_installed_version() {
     fi
 }
 
-# ─── Check if source files are present ───────────────────────────────────────
 is_in_repo() {
     [ -f "Cargo.toml" ] && grep -q "localdex" "Cargo.toml" 2>/dev/null
 }
@@ -288,18 +269,14 @@ pick_destination() {
         1) DEST="$CARGO_BIN"; SKIP_PATH=true ;;
         2) DEST="$USER_BIN";  SKIP_PATH=false ;;
         3) DEST="$SYSTEM_BIN"; SKIP_PATH=false ;;
-        4)
-            read -rp "Enter custom path: " DEST
-            SKIP_PATH=false ;;
-        *)
-            echo -e "${RED}Invalid choice. Exiting.${RESET}"
-            exit 1 ;;
+        4) read -rp "Enter custom path: " DEST; SKIP_PATH=false ;;
+        *) echo -e "${RED}Invalid choice. Exiting.${RESET}"; exit 1 ;;
     esac
 }
 
 # ─── PATH setup ───────────────────────────────────────────────────────────────
 setup_path() {
-    if [ "$SKIP_PATH" = true ]; then
+    if [ "${SKIP_PATH:-false}" = true ]; then
         return
     fi
 
@@ -321,7 +298,6 @@ setup_path() {
         else
             SHELL_CONFIG="$HOME/.profile"
         fi
-
         echo "" >> "$SHELL_CONFIG"
         echo "# ldx" >> "$SHELL_CONFIG"
         echo "export PATH=\"\$PATH:$DEST\"" >> "$SHELL_CONFIG"
@@ -330,9 +306,30 @@ setup_path() {
     fi
 }
 
+# ─── Generate config.toml from default_config.toml ───────────────────────────
+generate_config() {
+    local dest_dir="$1"
+    local config_file="$dest_dir/config.toml"
+
+    # Find default_config.toml — either in repo root or next to the binary
+    local default_toml=""
+    if [ -f "default_config.toml" ]; then
+        default_toml="default_config.toml"
+    elif [ -f "$dest_dir/default_config.toml" ]; then
+        default_toml="$dest_dir/default_config.toml"
+    fi
+
+    if [ -n "$default_toml" ]; then
+        cp "$default_toml" "$config_file"
+        echo -e "${GREEN}✓ Generated config.toml from default_config.toml${RESET}"
+    else
+        echo -e "${YELLOW}⚠ default_config.toml not found — skipping config generation${RESET}"
+        echo -e "${YELLOW}  Run: ldx --sync  after install to restore defaults${RESET}"
+    fi
+}
+
 # ─── Install from source ──────────────────────────────────────────────────────
 install_from_source() {
-    # Check for cargo — auto-install rustup if missing
     if ! command -v cargo &> /dev/null; then
         echo -e "${YELLOW}Rust/cargo not found.${RESET}"
         echo -e "${CYAN}Installing Rust via rustup...${RESET}"
@@ -345,7 +342,6 @@ install_from_source() {
             echo -e "${RED}Neither curl nor wget found. Please install Rust manually: https://rustup.rs${RESET}"
             exit 1
         fi
-        # Source cargo env so it's available in this session
         if [ -f "$HOME/.cargo/env" ]; then
             source "$HOME/.cargo/env"
         fi
@@ -354,7 +350,6 @@ install_from_source() {
         echo ""
     fi
 
-    # Clone if not already in repo
     if ! is_in_repo; then
         if ! command -v git &> /dev/null; then
             echo -e "${RED}git not found. Please install git first.${RESET}"
@@ -382,206 +377,30 @@ install_from_source() {
         cp "target/release/$BINARY_NAME" "$DEST/$ALIAS_NAME"
     fi
 
-    echo -e "${GREEN}✓ Installed: $DEST/$BINARY_NAME${RESET}"
-    echo -e "${GREEN}✓ Alias:     $DEST/$ALIAS_NAME${RESET}"
+    echo -e "${GREEN}✓ Binary installed: $DEST/$BINARY_NAME${RESET}"
+    echo -e "${GREEN}✓ Alias installed:  $DEST/$ALIAS_NAME${RESET}"
 
-    # Generate config.toml
-    CONFIG_FILE="$DEST/config.toml"
-    cat > "$CONFIG_FILE" << 'CONFIGEOF'
-# ═══════════════════════════════════════════════════════════════════════════
-# ldx configuration file (v0.0.5+)
-# ═══════════════════════════════════════════════════════════════════════════
-# Edit this file to customize flags, create aliases, and define custom commands
-#
-# os values: "all", "windows", "linux", "macos"
-# action types: "set_boolean", "set_value"
-
-# ═══════════════════════════════════════════════════════════════════════════
-# Built-in flags (editable)
-# ═══════════════════════════════════════════════════════════════════════════
-
-[flags.all-files]
-short = "a"
-long = "all-files"
-description = "Count all files, no filter needed"
-os = "all"
-action = "set_boolean"
-target = "all"
-
-[flags.all-drives]
-short = "A"
-long = "all-drives"
-description = "Scan all drives with a per-drive breakdown and total"
-os = "windows"
-action = "set_boolean"
-target = "all_drives"
-
-[flags.case-sensitive]
-short = "s"
-long = "case-sensitive"
-description = "Case-sensitive search"
-os = "all"
-action = "set_boolean"
-target = "case_sensitive"
-
-[flags.dir]
-short = "d"
-long = "dir"
-description = "Directory to search in (default: current)"
-os = "all"
-action = "set_value"
-target = "dir"
-
-[flags.dirs]
-short = "D"
-long = "dirs"
-description = "Search for directories instead of files"
-os = "all"
-action = "set_boolean"
-target = "dirs_only"
-
-[flags.extension]
-short = "e"
-long = "extension"
-description = "Search by file extension (e.g. pdf, rs)"
-os = "all"
-action = "set_value"
-target = "extension"
-
-[flags.first]
-short = "1"
-long = "first"
-description = "Stop after the first match"
-os = "all"
-action = "set_boolean"
-target = "first"
-
-[flags.help]
-short = "h"
-long = "help"
-description = "Show this help message"
-os = "all"
-action = "show_help"
-
-[flags.limit]
-short = "L"
-long = "limit"
-description = "Stop after N matches (e.g. -L 5)"
-os = "all"
-action = "set_value"
-target = "limit"
-
-[flags.open]
-short = "o"
-long = "open"
-description = "Open or launch the matched file"
-os = "all"
-action = "set_boolean"
-target = "open"
-
-[flags.quiet]
-short = "q"
-long = "quiet"
-description = "Suppress per-file output; still prints summary count"
-os = "all"
-action = "set_boolean"
-target = "quiet"
-
-[flags.stats]
-short = "S"
-long = "stats"
-description = "Show scan statistics"
-os = "all"
-action = "set_boolean"
-target = "stats"
-
-[flags.threads]
-short = "t"
-long = "threads"
-description = "Number of threads to use (default: all available)"
-os = "all"
-action = "set_value"
-target = "threads"
-
-[flags.verbose]
-short = "v"
-long = "verbose"
-description = "Show detailed scan breakdown (files + dirs separately)"
-os = "all"
-action = "set_boolean"
-target = "verbose"
-
-[flags.where]
-short = "w"
-long = "where"
-description = "Print the path with cd hint (implies -1)"
-os = "all"
-action = "set_boolean"
-target = "where_mode"
-
-# ═══════════════════════════════════════════════════════════════════════════
-# Custom flags (user-defined shortcuts)
-# ═══════════════════════════════════════════════════════════════════════════
-# Uncomment examples below or add your own!
-
-# [custom.pdf]
-# short = "P"
-# long = "pdf"
-# description = "Search for PDF files"
-# os = "all"
-# action = "set_value"
-# target = "extension"
-# value = "pdf"
-
-# [custom.music]
-# short = "M"
-# long = "music"
-# description = "Search for music files"
-# os = "all"
-# action = "set_value"
-# target = "extension"
-# value = "mp3"
-
-# ═══════════════════════════════════════════════════════════════════════════
-# Aliases (expand to multiple flags)
-# ═══════════════════════════════════════════════════════════════════════════
-# Uncomment examples below or add your own!
-
-# [aliases]
-# docs = "-e pdf -e docx -e txt"
-# fast = "-t 16 -q"
-# home = "-d ~ -S"
-CONFIGEOF
-
-    echo -e "${GREEN}✓ Generated config.toml${RESET}"
+    generate_config "$DEST"
 
     setup_path
 
-    # Clean up cloned dir if we cloned
-    CLONED_SOURCE=false
-    SOURCE_PATH=""
+    # Handle cloned source
     if [ -d "../localdex-src" ] || [ "$(basename "$PWD")" = "localdex-src" ]; then
-        CLONED_SOURCE=true
         cd ..
         SOURCE_PATH="$(pwd)/localdex-src"
-        
+
         echo ""
         echo -e "${YELLOW}Keep source code for future updates/modifications?${RESET}"
         read -rp "Keep source? [Y/n]: " KEEP_SRC
         KEEP_SRC=${KEEP_SRC:-Y}
-        
+
         if [[ "$KEEP_SRC" =~ ^[Yy]$ ]]; then
             echo -e "${CYAN}✓ Source kept at: $SOURCE_PATH${RESET}"
-            
-            # Save source path to config.toml
             CONFIG_FILE="$DEST/config.toml"
-            if [ -f "$CONFIG_FILE" ]; then
-                # Add meta section if it doesn't exist
-                if ! grep -q "\[meta\]" "$CONFIG_FILE"; then
-                    echo "" >> "$CONFIG_FILE"
-                    echo "[meta]" >> "$CONFIG_FILE"
-                    echo "source_path = "$SOURCE_PATH"" >> "$CONFIG_FILE"
-                fi
+            if [ -f "$CONFIG_FILE" ] && ! grep -q "\[meta\]" "$CONFIG_FILE"; then
+                echo "" >> "$CONFIG_FILE"
+                echo "[meta]" >> "$CONFIG_FILE"
+                echo "source_path = \"$SOURCE_PATH\"" >> "$CONFIG_FILE"
             fi
         else
             rm -rf localdex-src
@@ -597,8 +416,6 @@ install_from_binary() {
     echo ""
     install_from_source
 }
-
-
 
 # ─── Already installed flow ───────────────────────────────────────────────────
 INSTALLED_VERSION=$(get_installed_version)
@@ -616,9 +433,8 @@ if [ -n "$INSTALLED_VERSION" ] && [ "$FORCE" = false ]; then
         echo ""
         read -rp "Choice [1-3] (default: 1): " UPDATE_CHOICE
         UPDATE_CHOICE=${UPDATE_CHOICE:-1}
-
         case "$UPDATE_CHOICE" in
-            1|2) ;; # continue to install
+            1|2) ;;
             3) echo -e "${CYAN}Exiting.${RESET}"; exit 0 ;;
             *) echo -e "${RED}Invalid choice. Exiting.${RESET}"; exit 1 ;;
         esac
@@ -634,9 +450,8 @@ if [ -n "$INSTALLED_VERSION" ] && [ "$FORCE" = false ]; then
         echo ""
         read -rp "Choice [1-2] (default: 2): " REINSTALL_CHOICE
         REINSTALL_CHOICE=${REINSTALL_CHOICE:-2}
-
         case "$REINSTALL_CHOICE" in
-            1) ;; # continue to install
+            1) ;;
             2) echo -e "${CYAN}Exiting.${RESET}"; exit 0 ;;
             *) echo -e "${RED}Invalid choice. Exiting.${RESET}"; exit 1 ;;
         esac
@@ -655,17 +470,13 @@ fi
 echo ""
 echo -e "${GREEN}${BOLD}✓ ldx installed successfully!${RESET}"
 echo ""
-echo -e "${CYAN}${BOLD}ldx v0.1.0 installed! 🚀${RESET}"
-echo ""
-echo -e "${BOLD}Quick next steps:${RESET}"
+echo -e "${CYAN}${BOLD}Try it:${RESET}"
 echo -e "  ${CYAN}ldx --version${RESET}          # confirm install"
-echo -e "  ${CYAN}ldx --help${RESET}             # see the new dynamic help"
-echo -e "  ${CYAN}ldx --check${RESET}            # validate your config.toml"
+echo -e "  ${CYAN}ldx --help${RESET}             # see available flags"
+echo -e "  ${CYAN}ldx --check${RESET}            # validate your config"
 echo -e "  ${CYAN}ldx --sync${RESET}             # ensure all default flags are present"
 echo -e "  ${CYAN}ldx --edit${RESET}             # customize aliases or add your own flags"
 echo ""
-echo -e "Config location: ${CYAN}$(dirname "$(command -v ldx)")/config.toml${RESET}  (or run ${CYAN}ldx --config${RESET})"
-echo -e "Docs & source:   ${CYAN}https://github.com/dylanisaiahp/localdex${RESET}"
-echo ""
-echo -e "${YELLOW}Note: Pre-built binaries coming in future releases — for now, enjoy the source-built speed!${RESET}"
+echo -e "Config: ${CYAN}$(dirname "$(command -v ldx)" 2>/dev/null || echo "\$DEST")/config.toml${RESET}  (or run ${CYAN}ldx --config${RESET})"
+echo -e "Docs:   ${CYAN}https://github.com/dylanisaiahp/localdex${RESET}"
 echo ""

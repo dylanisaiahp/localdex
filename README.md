@@ -4,37 +4,33 @@
 
 **Blazing-fast parallel file search for Windows, Linux, and macOS**
 
-[![Version](https://img.shields.io/badge/version-0.0.8-blue.svg)](https://github.com/dylanisaiahp/localdex)
+[![Version](https://img.shields.io/badge/version-0.2.0-blue.svg)](https://github.com/dylanisaiahp/localdex)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![Built with Rust](https://img.shields.io/badge/built%20with-Rust-orange.svg)](https://www.rust-lang.org/)
 [![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20Linux%20%7C%20macOS-lightgrey.svg)](https://github.com/dylanisaiahp/localdex)
 
 *Find any file on your system in milliseconds — config-driven, alias-powered, cross-platform.*
 
-**Peak: 7,065,858 entries/s on Linux · 1,641,700 entries/s on Windows**
+**Peak: 1,491,712 entries/s on Windows (i5-13400F, t=16)**
 
 </div>
-
----
-
-> **Note:** ldx is the CLI front-end for the upcoming `parex` parallel search engine. After engine separation, ldx will be renamed to `prx`. See [Roadmap](#roadmap).
 
 ---
 
 ## 📦 Installation
 
 ```bash
-curl -sSf https://raw.githubusercontent.com/dylanisaiahp/localdex/main/scripts/install.sh | bash
+curl -sSf https://raw.githubusercontent.com/dylanisaiahp/localdex/main/install.sh | bash
 ```
 
 > **Windows:** Run via [Git Bash](https://gitforwindows.org/).
 
-Or build from source:
+Or clone and build:
 
 ```bash
 git clone https://github.com/dylanisaiahp/localdex
 cd localdex
-./scripts/build.sh
+./scripts/dev.sh build
 ```
 
 ---
@@ -42,19 +38,19 @@ cd localdex
 ## 🚀 Quick Start
 
 ```bash
-ldx invoice                        # find files with "invoice" in the name
+ldx invoice                        # find files matching "invoice"
 ldx -e rs -d ~/projects            # find all .rs files in a directory
 ldx -e pdf -q                      # count all PDFs quietly
-ldx vintagestory -o -1             # find and launch a file instantly
+ldx vintagestory -o -1             # find and open a file instantly
 ldx localdex -D -w                 # find a directory, print cd hint
 ldx -a -S -d C:\                   # count every file on C:\ with stats
 ldx -e log -L 5                    # stop after 5 matches
-ldx main.rs --exclude target       # search, skipping the target/ dir
+ldx main.rs --exclude target       # skip the target/ directory
 ```
 
 ---
 
-## 🐝 Common Flags
+## 🐝 Flags
 
 | Flag | Long | Description |
 |------|------|-------------|
@@ -67,27 +63,22 @@ ldx main.rs --exclude target       # search, skipping the target/ dir
 | `-w` | `--where` | Print path with cd hint |
 | `-q` | `--quiet` | Suppress per-file output |
 | `-S` | `--stats` | Show scan statistics |
+| `-s` | `--case-sensitive` | Case-sensitive search |
+| `-t` | `--threads` | Thread count (default: all logical cores) |
+| `-v` | `--verbose` | Files + dirs breakdown in stats |
 | `-a` | `--all-files` | Count all files, no filter |
+| `-A` | `--all-drives` | Scan all drives (Windows) |
+|      | `--exclude` | Skip directories (comma-separated) |
 
-<details>
-<summary>Advanced flags</summary>
+**Management:**
 
-| Flag | Long | Description | OS |
-|------|------|-------------|-----|
-| `-A` | `--all-drives` | Scan all drives with per-drive breakdown | Windows |
-| `-s` | `--case-sensitive` | Case-sensitive search | All |
-| `-t` | `--threads` | Thread count (default: all logical cores) | All |
-| `-v` | `--verbose` | Files + dirs breakdown in stats | All |
-| `-h` | `--help` | Dynamic help — shows your aliases too | All |
-| | `--exclude` | Skip directories (comma-separated) | All |
-| | `--check` | Validate config | All |
-| | `--sync` | Add missing default flags to config | All |
-| | `--reset` | Restore default flags (keeps aliases) | All |
-| | `--edit` | Open config in editor | All |
-| | `--config` | Print config location | All |
-| | `--version` | Show version | All |
-
-</details>
+```bash
+ldx --check     # validate config
+ldx --sync      # restore any missing default flags
+ldx --reset     # reset flags to defaults (keeps aliases & custom)
+ldx --edit      # open config in editor
+ldx --config    # print config file location
+```
 
 > `-d` sets *where* to search. `-D` searches *for* directories. `-s` = case-sensitive, `-S` = stats.
 
@@ -95,14 +86,14 @@ ldx main.rs --exclude target       # search, skipping the target/ dir
 
 ## ⚙️ Configuration
 
-`config.toml` is auto-generated on first install. Every flag is remappable. Add aliases and custom flags to make ldx your own.
+`config.toml` is generated automatically on install. Every flag is remappable. Add aliases and custom flags to make ldx yours.
 
 ```toml
 [aliases]
 repo = "localdex -D -d D: -1 -S -w -q"
-pdf  = "-e pdf -q"
+ct   = "-a -A -S -q --verbose"
 
-[custom.rs]
+[custom.rust]
 short = "R"
 long = "rust"
 description = "Search for Rust files"
@@ -112,22 +103,41 @@ target = "extension"
 value = "rs"
 ```
 
-```bash
-ldx --check   # validate config
-ldx --sync    # restore any missing default flags
-ldx --reset   # reset flags to defaults (keeps aliases & custom)
-```
-
 ---
 
 ## 📊 Benchmarks
 
-| Platform | Hardware | Peak Speed |
-|----------|----------|------------|
-| Linux (CachyOS) | Ryzen 7 5825U, NVMe | **7,065,858 entries/s** |
-| Windows 11 | i5-13400F, SSD | **1,641,700 entries/s** |
+Warm cache, 20 runs per combo, i5-13400F, Windows 11:
 
-See [BENCHMARKS.md](BENCHMARKS.md) for full thread scaling tables and Linux vs Windows comparisons.
+| Directory | Best threads | Peak (entries/s) |
+|-----------|-------------|-----------------|
+| C:\Program Files | t=16 | **1,491,712** |
+| C:\Users\dylan | t=12 | **733,677** |
+| D:\ | t=16 | **702,785** |
+| C:\ | t=12 | **490,109** |
+
+See [BENCHMARKS.md](BENCHMARKS.md) for full thread scaling tables.
+
+---
+
+## 🏗️ Architecture
+
+ldx is built on **[parex](https://crates.io/crates/parex)** — a dedicated parallel search engine library published separately to crates.io.
+
+```
+ldx (CLI)
+ ├── flags.rs      — argument parsing
+ ├── config.rs     — config loading
+ ├── source.rs     — DirectorySource (implements parex::Source)
+ ├── search.rs     — thin wrapper around parex::search()
+ ├── display.rs    — output formatting
+ └── launcher.rs   — OS file opener
+
+parex (engine)
+ ├── Source trait  — walk anything: files, databases, memory
+ ├── Matcher trait — substring, extension, fuzzy, custom
+ └── SearchBuilder — fluent API, thread control, error collection
+```
 
 ---
 
@@ -138,20 +148,19 @@ See [BENCHMARKS.md](BENCHMARKS.md) for full thread scaling tables and Linux vs W
 | [ROADMAP.md](ROADMAP.md) | What's next |
 | [CHANGELOG.md](CHANGELOG.md) | Version history |
 | [BENCHMARKS.md](BENCHMARKS.md) | Performance data |
-| [CONTRIBUTING.md](CONTRIBUTING.md) | How to contribute |
-
+| [parex on crates.io](https://crates.io/crates/parex) | The search engine powering ldx |
 
 ---
 
 ## 🤝 Contributing
 
-See [CONTRIBUTING.md](CONTRIBUTING.md). Linux and macOS benchmark results especially welcome!
+Linux and macOS benchmark results especially welcome — run `./scripts/dev.sh benchmark` and open a PR with the `.md` output.
 
 ---
 
-## ⚠️ Disclaimer & License
+## ⚠️ License
 
-MIT — see [LICENSE](LICENSE). Provided as-is; use responsibly.
+MIT — see [LICENSE](LICENSE).
 
 ---
 
@@ -159,6 +168,6 @@ MIT — see [LICENSE](LICENSE). Provided as-is; use responsibly.
 
 Built with ❤️ and Rust by [dylanisaiahp](https://github.com/dylanisaiahp)
 
-*If ldx helped you, consider giving it a ⭐!*
+*If ldx helped you, consider giving it a ⭐*
 
 </div>

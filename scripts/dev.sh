@@ -62,7 +62,9 @@ show_help() {
     echo -e "  ${CYAN}--warm${RESET}       Label as warm cache run (default)"
     echo -e "  ${CYAN}--threads LIST${RESET} Comma-separated thread counts"
     echo -e "  ${CYAN}--dirs LIST${RESET}  Comma-separated directories"
-    echo -e "  ${CYAN}--out FILE${RESET}   Custom output filename"
+    echo -e "  ${CYAN}--out FILE${RESET}   Custom output filename (without extension)"
+    echo -e "  ${CYAN}--live${RESET}       Print live table as benchmark runs"
+    echo -e "  ${CYAN}--csv${RESET}        Also save raw CSV alongside the markdown report"
     echo ""
     echo -e "${BOLD}Examples:${RESET}"
     echo -e "  ${CYAN}./scripts/dev.sh build${RESET}"
@@ -172,9 +174,12 @@ cmd_build() {
     echo -e "${GREEN}✓ Binary installed: ${DEST}/${BINARY_NAME}${RESET}"
     echo -e "${GREEN}✓ Alias installed:  ${DEST}/${ALIAS_NAME}${RESET}"
 
-    if [ -f "config.toml" ]; then
-        cp "config.toml" "$DEST/config.toml"
-        echo -e "${GREEN}✓ config.toml copied${RESET}"
+    # Generate config.toml from default_config.toml
+    if [ -f "default_config.toml" ]; then
+        cp "default_config.toml" "$DEST/config.toml"
+        echo -e "${GREEN}✓ config.toml generated from default_config.toml${RESET}"
+    elif [ -f "$DEST/config.toml" ]; then
+        echo -e "${GREEN}✓ config.toml already present — skipping${RESET}"
     fi
 
     # PATH setup
@@ -220,6 +225,8 @@ cmd_benchmark() {
     THREAD_LIST="1,2,4,6,8,10,12,14,16"
     CUSTOM_DIRS=""
     CUSTOM_OUT=""
+    LIVE=false
+    CSV=false
 
     while [[ $# -gt 0 ]]; do
         case "$1" in
@@ -229,6 +236,8 @@ cmd_benchmark() {
             --threads) THREAD_LIST="$2"; shift 2 ;;
             --dirs)    CUSTOM_DIRS="$2"; shift 2 ;;
             --out)     CUSTOM_OUT="$2"; shift 2 ;;
+            --live)    LIVE=true; shift ;;
+            --csv)     CSV=true; shift ;;
             *)
                 echo -e "${RED}Unknown benchmark argument: $1${RESET}"
                 echo "Run ./scripts/dev.sh --help for usage"
@@ -270,19 +279,21 @@ cmd_benchmark() {
     [ -z "$CPU_SHORT" ] && CPU_SHORT="unknown-cpu"
 
     DATE=$(date +%Y-%m-%d)
-    OUT_FILE="${CUSTOM_OUT:-benchmark_${CACHE_TYPE}_${RUNS}runs_${CPU_SHORT}_${DATE}.csv}"
+    MD_FILE="${CUSTOM_OUT:-benchmark_${CACHE_TYPE}_${RUNS}runs_${CPU_SHORT}_${DATE}.md}"
+    CSV_FILE="${MD_FILE%.md}.csv"
 
     TOTAL_COMBOS=$(( ${#DIRS[@]} * ${#THREADS[@]} ))
     TOTAL_RUNS=$(( TOTAL_COMBOS * RUNS ))
 
     echo ""
     echo -e "${CYAN}${BOLD}ldx Benchmark${RESET}"
-    echo -e "${CYAN}OS: $OS | Cache: $CACHE_TYPE | Runs per combo: $RUNS${RESET}"
-    echo -e "${CYAN}CPU: $CPU${RESET}"
-    echo -e "${CYAN}Total runs: $TOTAL_RUNS | Output: $OUT_FILE${RESET}"
+    echo -e "${CYAN}OS: $OS | Cache: $CACHE_TYPE | Runs: $RUNS per combo | CPU: $CPU_SHORT${RESET}"
     echo ""
 
-    echo "Directory,Threads,Runs,Avg,Median,Min,Max,AllSpeeds" > "$OUT_FILE"
+    [ "$CSV" = true ] && echo "Directory,Threads,Runs,Avg,Median,Min,Max,AllSpeeds" > "$CSV_FILE"
+
+    # Collect all results for markdown summary
+    declare -a MD_RESULTS
 
     calc_stats() {
         local speeds_str="$1"
@@ -308,33 +319,95 @@ cmd_benchmark() {
         }'
     }
 
+    fmt_num() {
+        echo "$1" | sed ':a;s/\B[0-9]\{3\}\>/,&/;ta'
+    }
+
+    CURRENT_DIR=""
     CURRENT_RUN=0
+
     for DIR in "${DIRS[@]}"; do
         for T in "${THREADS[@]}"; do
             SPEEDS=""
+
+            # Print directory header on first thread for that dir
+            if [ "$DIR" != "$CURRENT_DIR" ]; then
+                CURRENT_DIR="$DIR"
+                if [ "$LIVE" = true ]; then
+                    echo ""
+                    echo -e "${BOLD}  $DIR${RESET}"
+                    printf "  %-10s %14s %14s %14s %14s\n" "Threads" "Avg" "Median" "Min" "Max"
+                    printf "  %s\n" "----------------------------------------------------------------------"
+                else
+                    echo -ne "  Benchmarking ${CYAN}$DIR${RESET}..."
+                fi
+            fi
+
             for (( i=1; i<=RUNS; i++ )); do
                 CURRENT_RUN=$(( CURRENT_RUN + 1 ))
-                printf "\r${CYAN}[%d/%d]${RESET} Dir: %-30s Threads: %-3s Run: %d/%d" \
-                    "$CURRENT_RUN" "$TOTAL_RUNS" "$DIR" "$T" "$i" "$RUNS"
+                if [ "$LIVE" = false ]; then
+                    printf "\r  Benchmarking ${CYAN}%-40s${RESET} [%d/%d]" "$DIR" "$CURRENT_RUN" "$TOTAL_RUNS"
+                fi
                 OUTPUT=$(ldx -a -q -S -d "$DIR" -t "$T" 2>&1)
                 SPEED=$(echo "$OUTPUT" | grep -oP '[\d,]+(?= entries/s)' | tr -d ',' | head -1)
-                if [ -n "$SPEED" ]; then
-                    SPEEDS="${SPEEDS:+$SPEEDS;}$SPEED"
-                fi
+                [ -n "$SPEED" ] && SPEEDS="${SPEEDS:+$SPEEDS;}$SPEED"
             done
+
             if [ -n "$SPEEDS" ]; then
                 STATS=$(calc_stats "$SPEEDS")
+                AVG=$(echo    "$STATS" | cut -d',' -f1)
+                MED=$(echo    "$STATS" | cut -d',' -f2)
+                MIN=$(echo    "$STATS" | cut -d',' -f3)
+                MAX=$(echo    "$STATS" | cut -d',' -f4)
                 RUN_COUNT=$(echo "$SPEEDS" | tr ';' '\n' | wc -l | tr -d ' ')
-                echo "\"$DIR\",$T,$RUN_COUNT,$STATS,\"$SPEEDS\"" >> "$OUT_FILE"
-                AVG=$(echo "$STATS" | cut -d',' -f1)
-                printf "\r${GREEN}+${RESET} %-30s t=%-3s avg=%s/s%50s\n" "$DIR" "$T" "$AVG" ""
+
+                [ "$CSV" = true ] && echo "\"$DIR\",$T,$RUN_COUNT,$STATS,\"$SPEEDS\"" >> "$CSV_FILE"
+
+                # Store for markdown
+                MD_RESULTS+=("$DIR|$T|$AVG|$MED|$MIN|$MAX")
+
+                if [ "$LIVE" = true ]; then
+                    printf "  t=%-8s %14s %14s %14s %14s\n"                         "$T" "$(fmt_num "$AVG")" "$(fmt_num "$MED")" "$(fmt_num "$MIN")" "$(fmt_num "$MAX")"
+                fi
             fi
         done
     done
 
+    # Clear the progress line
+    [ "$LIVE" = false ] && printf "\r%80s\r" ""
+
+    # ── Write markdown summary ────────────────────────────────────────────────
+    {
+        echo "# ldx Benchmark Results"
+        echo ""
+        echo "**Date:** $DATE  "
+        echo "**CPU:** $CPU  "
+        echo "**OS:** $OS  "
+        echo "**Cache:** $CACHE_TYPE  "
+        echo "**Runs per combo:** $RUNS  "
+        echo ""
+
+        PREV_DIR=""
+        for RESULT in "${MD_RESULTS[@]}"; do
+            IFS='|' read -r D T AVG MED MIN MAX <<< "$RESULT"
+            if [ "$D" != "$PREV_DIR" ]; then
+                [ -n "$PREV_DIR" ] && echo ""
+                echo "## $D"
+                echo ""
+                echo "| Threads | Avg (entries/s) | Median | Min | Max |"
+                echo "|---------|----------------|--------|-----|-----|"
+                PREV_DIR="$D"
+            fi
+            echo "| t=$T | $(fmt_num "$AVG") | $(fmt_num "$MED") | $(fmt_num "$MIN") | $(fmt_num "$MAX") |"
+        done
+        echo ""
+    } > "$MD_FILE"
+
+    # ── Final summary ─────────────────────────────────────────────────────────
     echo ""
     echo -e "${GREEN}${BOLD}Benchmark complete!${RESET}"
-    echo -e "${CYAN}Results: ${BOLD}${OUT_FILE}${RESET}"
+    echo -e "  ${CYAN}Report:${RESET} $MD_FILE"
+    [ "$CSV" = true ] && echo -e "  ${CYAN}CSV:${RESET}    $CSV_FILE"
     echo ""
 }
 
@@ -369,7 +442,7 @@ cmd_bump() {
     NEXT_ROADMAP=""
     if [ -f "$VISION" ]; then
         while IFS= read -r line; do
-            if echo "$line" | grep -qP '^### v[\d]+\.[\d]+\.[\d]+' && ! echo "$line" | grep -q '✓'; then
+            if echo "$line" | grep -qP '^### v[\d]+\.[\d]+\.[\d]+' && ! echo "$line" | grep -qE '✓|Shipped'; then
                 NEXT_ROADMAP=$(echo "$line" | grep -oP '[\d]+\.[\d]+\.[\d]+')
                 break
             fi
@@ -401,7 +474,7 @@ cmd_bump() {
 
     echo ""
     echo -e "${CYAN}${BOLD}══════════════════════════════════════════════════════════════${RESET}"
-    echo -e "${CYAN}${BOLD}               localdex / prx Version Bumper${RESET}"
+    echo -e "${CYAN}${BOLD}               localdex / ldx Version Bumper${RESET}"
     echo -e "${CYAN}${BOLD}══════════════════════════════════════════════════════════════${RESET}"
     echo ""
     echo -e "  Current version : ${BOLD}${CURRENT}${RESET}"

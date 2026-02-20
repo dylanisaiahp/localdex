@@ -1,36 +1,44 @@
 # Roadmap
 
-Current status: **v0.1.0 Beta** — engine separation next.
+Current status: **v0.2.0** — parex integrated, engine overhaul complete.
 
 ---
 
-## v0.1.1 — Script Consolidation (Next)
-- `benchmark.sh`, `build.sh`, `bump.sh` → `dev.sh` ✓
-- `uninstall.sh` absorbed into `install.sh --uninstall` ✓
-- Fix `--uninstall` header ordering in install.sh
+## v0.2.0 — Engine Overhaul ✓
+- `parex v0.1.0` published to crates.io ✓
+- `DirectorySource` implemented in ldx ✓
+- `search.rs` gutted — replaced with `parex::search()` wrapper ✓
+- `config.rs` split → `config.rs` + `config_check.rs` ✓
+- `default_config.toml` extracted from source ✓
+- `flags.rs` refactored into focused helpers ✓
+- `install.sh` generates config from file ✓
+- `dev.sh benchmark` outputs `.md` report, `--live` table, `--csv` raw data ✓
+- Dropped `aho-corasick`, `num_cpus` ✓
 
-## Engine Separation Milestone
-- Create `parex` repo — extract core, design Query API
-- Publish `parex` v0.1.0 to crates.io
-- Create `prx` repo — rename localdex, depend on `parex`
-- Publish `prx` v0.1.0
-- Unit tests (much easier post-separation)
+## v0.3.0 — Test Suite
+- Unit tests for `flags.rs` — alias expansion, custom flag resolution, validation combos
+- Unit tests for `config.rs` — load, is_flag_available, path resolution
+- Integration tests — full search round-trips using `DirectorySource`
+- `benches/` with Criterion in parex — baseline throughput measurements
+- parex: `collect_errors` stress test with permission-denied directories
 
-## parex Query API
-- Builder pattern: `parex::search().matching("x").in_dir("~").run()`
-- Typed errors with `thiserror`
-- Opt-in error collection via `.collect_errors(true)`
-- `--stale N` metadata filter (modified > N days ago) — cheap pre-filter before parallel walk
+## v0.4.0 — parex v0.2.0 (Parallelism Improvements)
+- True parallel matching — engine distributes match work across threads
+- Async source support — `AsyncSource` trait for non-blocking IO
+- `--stale N` metadata filter — modified > N days ago, cheap pre-filter
+- parex publish v0.2.0 to crates.io
 
-## parallax (GUI)
+## parallax (GUI) — Future
 - Tauri + Rust backend, borderless window
-- Real-time streaming results, no loading spinners
+- Real-time streaming results
+- Dual mode: aesthetic (Atkinson Hyperlegible) and advanced (JetBrains Mono)
 - Plugin system: CSS themes → Lua → JS → Python → Rust
-- Auto-benchmark on first launch
+- Color accent picker, accessibility-first design
 
 ## Future
 - `parafetch` — neofetch alternative using parex for file counts
-- macOS benchmarks
+- macOS benchmarks and CI
+- Pre-built binary releases
 - HDD benchmark contributions
 
 ---

@@ -1,6 +1,6 @@
 # Contributing to ldx
 
-Thanks for your interest in contributing! ldx is a fast, parallel file search CLI written in Rust. Contributions of all kinds are welcome — bug fixes, features, benchmarks, documentation, and platform testing.
+Thanks for your interest in contributing! ldx is a fast, parallel file search CLI built on [parex](https://crates.io/crates/parex). Contributions of all kinds are welcome — bug fixes, features, benchmarks, documentation, and platform testing.
 
 ---
 
@@ -17,13 +17,13 @@ Thanks for your interest in contributing! ldx is a fast, parallel file search CL
 ```bash
 git clone https://github.com/dylanisaiahp/localdex
 cd localdex
-./scripts/build.sh
+./scripts/dev.sh build
 ```
 
 Or install directly:
 
 ```bash
-./scripts/install.sh
+./install.sh
 ```
 
 See [README.md](README.md) for full installation instructions.
@@ -33,20 +33,20 @@ See [README.md](README.md) for full installation instructions.
 ## Development Workflow
 
 ```bash
+# Build and install locally
+./scripts/dev.sh build
+
 # Build in debug mode
-./scripts/build.sh --debug
+./scripts/dev.sh build --debug
 
-# Build in release mode
-./scripts/build.sh --release
-
-# Run clippy before submitting
-cargo clippy
+# Lint — must be clean before submitting
+cargo clippy -- -D warnings
 
 # Run tests
 cargo test
 ```
 
-Please ensure `cargo clippy` produces no warnings before opening a PR.
+Please ensure `cargo clippy -- -D warnings` produces zero warnings before opening a PR.
 
 ---
 
@@ -56,43 +56,44 @@ If you'd like to contribute benchmark results from your hardware, run:
 
 ```bash
 # Warm cache (run anytime)
-./scripts/benchmark.sh --runs 20 --warm
+./scripts/dev.sh benchmark --runs 20 --warm
 
 # Cold cache (run immediately after reboot, before anything else)
-./scripts/benchmark.sh --runs 20 --cold
+./scripts/dev.sh benchmark --runs 20 --cold
+
+# With live table output
+./scripts/dev.sh benchmark --runs 20 --live
 ```
 
-Then open an issue or PR with your CSV files attached. Please include your hardware specs (CPU, RAM, storage type). Results are stored in `/benchmarks` and credited in the README.
+Then open an issue or PR with the generated `.md` file attached. Please include your hardware specs (CPU, RAM, storage type). Results are credited in [BENCHMARKS.md](BENCHMARKS.md).
 
 ---
 
 ## Roadmap
 
-Check the [README roadmap](README.md#roadmap) before starting work to avoid duplicating planned features. If you want to work on something not listed, open an issue first to discuss it.
-
-Current focus is **engine separation** — extracting parex from prx. See the roadmap in README.md for details.
+Check [ROADMAP.md](ROADMAP.md) before starting work to avoid duplicating planned features. If you want to work on something not listed, open an issue first to discuss it.
 
 ---
 
 ## Pull Request Guidelines
 
 - Keep PRs focused — one feature or fix per PR
-- Run `cargo clippy` and fix all warnings before submitting
+- Run `cargo clippy -- -D warnings` and fix all warnings before submitting
 - Add a clear description of what changed and why
-- If adding a new flag, add it to `DEFAULT_CONFIG` in `config.rs` and update the README flags table
-- If you have benchmark results, include them!
+- If adding a new flag, add it to `default_config.toml` and update the README flags table
+- If you have benchmark results, include the `.md` output!
 
 ---
 
 ## Platform Testing
 
-ldx aims to support Windows, Linux, and macOS. If you're on Linux or macOS, your benchmark results and bug reports are especially valuable — most development so far has been on Windows.
+ldx supports Windows, Linux, and macOS. If you're on Linux or macOS, your benchmark results and bug reports are especially valuable — most development so far has been on Windows.
 
 **Known platform notes:**
 - Windows: tested on Windows 11, Git Bash required for scripts
-- Linux: tested on CachyOS (Ryzen 7 5825U) — peak 7M entries/s
-- macOS: builds and runs but benchmarks not yet collected
-- HDD benchmarks: cold cache numbers on a full HDD welcome — current HDD data was from a nearly empty drive
+- Linux: builds and runs, benchmarks not yet collected for v0.2.0
+- macOS: builds and runs, benchmarks not yet collected
+- HDD benchmarks: cold cache numbers on a full HDD welcome
 
 ---
 

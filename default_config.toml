@@ -1,0 +1,123 @@
+[flags.all-files]
+short = "a"
+long = "all-files"
+description = "Count all files, no filter"
+os = "all"
+action = "set_boolean"
+target = "all"
+
+[flags.all-drives]
+short = "A"
+long = "all-drives"
+description = "Scan all drives with per-drive breakdown"
+os = "windows"
+action = "set_boolean"
+target = "all_drives"
+
+[flags.case-sensitive]
+short = "s"
+long = "case-sensitive"
+description = "Case-sensitive search"
+os = "all"
+action = "set_boolean"
+target = "case_sensitive"
+
+[flags.dir]
+short = "d"
+long = "dir"
+description = "Directory to search (default: current)"
+os = "all"
+action = "set_value"
+target = "dir"
+
+[flags.dirs]
+short = "D"
+long = "dirs"
+description = "Search for directories"
+os = "all"
+action = "set_boolean"
+target = "dirs_only"
+
+[flags.extension]
+short = "e"
+long = "extension"
+description = "Filter by extension (e.g. pdf, rs)"
+os = "all"
+action = "set_value"
+target = "extension"
+
+[flags.first]
+short = "1"
+long = "first"
+description = "Stop after first match"
+os = "all"
+action = "set_boolean"
+target = "first"
+
+[flags.help]
+short = "h"
+long = "help"
+description = "Show this help"
+os = "all"
+action = "show_help"
+target = "help"
+
+[flags.limit]
+short = "L"
+long = "limit"
+description = "Stop after N matches (e.g. -L 5)"
+os = "all"
+action = "set_value"
+target = "limit"
+
+[flags.open]
+short = "o"
+long = "open"
+description = "Open the matched file"
+os = "all"
+action = "set_boolean"
+target = "open"
+
+[flags.quiet]
+short = "q"
+long = "quiet"
+description = "Suppress output; still prints count"
+os = "all"
+action = "set_boolean"
+target = "quiet"
+
+[flags.stats]
+short = "S"
+long = "stats"
+description = "Show scan statistics"
+os = "all"
+action = "set_boolean"
+target = "stats"
+
+[flags.threads]
+short = "t"
+long = "threads"
+description = "Thread count (default: all cores)"
+os = "all"
+action = "set_value"
+target = "threads"
+
+[flags.verbose]
+short = "v"
+long = "verbose"
+description = "Verbose stats (files + dirs)"
+os = "all"
+action = "set_boolean"
+target = "verbose"
+
+[flags.where]
+short = "w"
+long = "where"
+description = "Print path with cd hint"
+os = "all"
+action = "set_boolean"
+target = "where_mode"
+
+[aliases]
+
+[custom]

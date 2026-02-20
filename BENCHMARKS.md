@@ -2,11 +2,11 @@
 
 > **entries/s** = filesystem entries (files + directories) scanned per second. Higher is better.
 
-Want to run your own? Use `./scripts/benchmark.sh` — outputs a CSV. Contributions welcome!
+Run your own: `./scripts/dev.sh benchmark` — outputs a `.md` report. Contributions welcome!
 
 ---
 
-## 🖥️ Windows — i5-13400F, SSD
+## 🖥️ Windows — i5-13400F
 
 | Component | Spec |
 |-----------|------|
@@ -14,157 +14,103 @@ Want to run your own? Use `./scripts/benchmark.sh` — outputs a CSV. Contributi
 | **RAM** | 32GB |
 | **OS** | Windows 11 64-bit |
 | **Storage** | 500GB SSD (C:) + 1TB SSD (D:) |
+| **Engine** | ldx v0.2.0 + parex v0.1.0 |
 
-> 30 warm runs + 20 cold runs per configuration.
+> 20 warm runs per combination.
 
-### Thread Scaling
+### Thread Scaling Summary
 
-| Directory | Real-world equivalent | Entries | Sweet spot | Peak speed |
-|-----------|----------------------|---------|------------|------------|
-| `C:\` | Full OS drive | 945k | 10 threads | 526,404/s |
-| `C:\Users\dylan` | Home folder | 520k | 10–12 threads | 752,200/s |
-| `C:\Program Files` | App installs | 86k | 16 threads | 1,641,700/s ✅ |
-| `D:\` | Dev/data drive | 37k | 16 threads | 815,817/s |
+| Directory | Entries | Sweet spot | Peak speed |
+|-----------|---------|------------|------------|
+| `C:\Program Files` | 97k | t=16 | **1,491,712/s** ✅ |
+| `C:\Users\dylan` | 40k | t=12 | **733,677/s** ✅ |
+| `D:\` | 40k | t=14–16 | **702,785/s** ✅ |
+| `C:\` | 954k | t=12 | **490,109/s** ✅ |
 
-<details>
-<summary>Full thread scaling tables</summary>
+### `C:\Program Files` — App Installs (97k entries)
 
-#### `C:\` (945k entries) — Full OS Drive
+| Threads | Avg | Median | Min | Max |
+|---------|-----|--------|-----|-----|
+| t=1 | 240,009 | 242,637 | 196,292 | 244,792 |
+| t=2 | 437,303 | 439,774 | 415,451 | 447,906 |
+| t=4 | 757,654 | 757,734 | 731,520 | 776,045 |
+| t=6 | 1,037,236 | 1,039,680 | 967,242 | 1,070,880 |
+| t=8 | 1,146,591 | 1,145,172 | 1,109,722 | 1,178,194 |
+| t=10 | 1,234,493 | 1,234,333 | 1,191,375 | 1,284,442 |
+| t=12 | 1,328,615 | 1,331,237 | 1,293,939 | 1,375,898 |
+| t=14 | 1,421,184 | 1,421,973 | 1,363,090 | 1,453,836 |
+| **t=16** | **1,491,712** | **1,482,665** | **1,431,841** | **1,539,872** ✅ |
 
-| Threads | Warm Avg | Warm Median | Cold Avg | Cold Median |
-|---------|----------|-------------|----------|-------------|
-| 1 | 78,007/s | 70,511/s | 114,478/s | 125,380/s |
-| 2 | 133,680/s | 133,169/s | 216,171/s | 216,116/s |
-| 4 | 353,154/s | 354,510/s | 357,055/s | 357,571/s |
-| 6 | 466,596/s | 467,436/s | 469,815/s | 468,738/s |
-| 8 | 497,543/s | 498,302/s | 502,630/s | 499,327/s |
-| **10** | **526,404/s** | **522,122/s** | **518,317/s** | **515,980/s** ✅ |
-| 12 | 516,335/s | 516,611/s | 502,819/s | 502,919/s |
-| 14 | 465,166/s | 467,256/s | 459,313/s | 460,702/s |
-| 16 | 440,848/s | 437,274/s | 431,975/s | 430,744/s |
+### `C:\Users\dylan` — Home Folder (40k entries)
 
-#### `C:\Users\dylan` (520k entries) — Home Folder
+| Threads | Avg | Median | Min | Max |
+|---------|-----|--------|-----|-----|
+| t=1 | 105,205 | 102,636 | 94,254 | 131,729 |
+| t=2 | 241,015 | 241,552 | 233,698 | 244,068 |
+| t=4 | 415,172 | 415,168 | 409,350 | 423,978 |
+| t=6 | 565,558 | 564,892 | 549,562 | 577,262 |
+| t=8 | 622,446 | 625,437 | 576,332 | 643,910 |
+| t=10 | 684,701 | 687,959 | 652,094 | 705,739 |
+| **t=12** | **733,677** | **736,621** | **694,880** | **773,670** ✅ |
+| t=14 | 696,897 | 701,536 | 607,756 | 749,477 |
+| t=16 | 654,150 | 662,517 | 573,265 | 711,714 |
 
-| Threads | Warm Avg | Warm Median | Cold Avg | Cold Median |
-|---------|----------|-------------|----------|-------------|
-| 1 | 148,005/s | 149,392/s | 163,079/s | 164,582/s |
-| 2 | 263,567/s | 269,237/s | 273,696/s | 276,742/s |
-| 4 | 450,877/s | 453,103/s | 462,633/s | 462,200/s |
-| 6 | 603,919/s | 603,681/s | 618,517/s | 616,414/s |
-| 8 | 647,473/s | 663,633/s | 693,803/s | 698,297/s |
-| **10** | 731,840/s | 733,470/s | **743,145/s** | **739,625/s** ✅ |
-| **12** | **747,916/s** | **752,200/s** | 721,559/s | 715,886/s |
-| 14 | 726,490/s | 717,343/s | 699,147/s | 707,634/s |
-| 16 | 685,486/s | 688,550/s | 647,972/s | 636,272/s |
+### `D:\` — Dev Drive (40k entries)
 
-#### `C:\Program Files` (86k entries) — App Installs
+| Threads | Avg | Median | Min | Max |
+|---------|-----|--------|-----|-----|
+| t=1 | 133,841 | 134,230 | 122,904 | 136,342 |
+| t=2 | 239,490 | 240,564 | 220,721 | 243,317 |
+| t=4 | 408,666 | 408,700 | 399,339 | 423,104 |
+| t=6 | 539,889 | 541,911 | 507,730 | 562,466 |
+| t=8 | 569,958 | 581,289 | 341,281 | 614,747 |
+| t=10 | 624,108 | 625,319 | 582,535 | 659,347 |
+| t=12 | 647,755 | 645,707 | 586,600 | 700,452 |
+| t=14 | 699,710 | 694,386 | 658,563 | 760,308 |
+| **t=16** | **702,785** | **718,690** | **380,718** | **789,258** ✅ |
 
-| Threads | Warm Avg | Warm Median | Cold Avg | Cold Median |
-|---------|----------|-------------|----------|-------------|
-| 1 | 290,563/s | 297,032/s | 306,049/s | 310,806/s |
-| 2 | 509,440/s | 509,217/s | 529,256/s | 529,749/s |
-| 4 | 841,393/s | 843,476/s | 867,909/s | 869,182/s |
-| 6 | 1,125,433/s | 1,127,601/s | 1,148,363/s | 1,144,717/s |
-| 8 | 1,240,273/s | 1,244,297/s | 1,295,313/s | 1,295,280/s |
-| 10 | 1,336,502/s | 1,341,616/s | 1,372,124/s | 1,364,888/s |
-| 12 | 1,444,864/s | 1,444,834/s | 1,461,014/s | 1,457,803/s |
-| 14 | 1,553,522/s | 1,567,294/s | 1,573,560/s | 1,583,581/s |
-| **16** | **1,618,843/s** | **1,617,653/s** | **1,641,700/s** | **1,646,164/s** ✅ |
+### `C:\` — Full OS Drive (954k entries)
 
-#### `D:\` (37k entries) — Dev Drive
+| Threads | Avg | Median | Min | Max |
+|---------|-----|--------|-----|-----|
+| t=1 | 50,330 | 47,233 | 46,161 | 85,940 |
+| t=2 | 107,640 | 108,227 | 100,750 | 112,833 |
+| t=4 | 318,970 | 319,139 | 313,636 | 320,618 |
+| t=6 | 426,060 | 426,804 | 404,269 | 433,254 |
+| t=8 | 465,919 | 466,973 | 438,564 | 482,274 |
+| t=10 | 479,445 | 480,552 | 416,383 | 502,805 |
+| **t=12** | **490,109** | **486,225** | **474,602** | **524,093** ✅ |
+| t=14 | 463,513 | 463,306 | 427,750 | 499,343 |
+| t=16 | 430,815 | 434,328 | 401,978 | 455,895 |
 
-| Threads | Warm Avg | Warm Median | Cold Avg | Cold Median |
-|---------|----------|-------------|----------|-------------|
-| 1 | 153,285/s | 155,817/s | 156,267/s | 162,360/s |
-| 2 | 263,950/s | 268,110/s | 278,817/s | 279,628/s |
-| 4 | 443,506/s | 445,309/s | 453,977/s | 455,020/s |
-| 6 | 583,630/s | 592,631/s | 593,988/s | 596,992/s |
-| 8 | 641,250/s | 644,592/s | 661,291/s | 662,264/s |
-| 10 | 675,445/s | 688,288/s | 707,140/s | 706,158/s |
-| 12 | 685,660/s | 701,194/s | 750,338/s | 755,772/s |
-| 14 | 704,422/s | 720,035/s | 791,790/s | 795,886/s |
-| **16** | **749,385/s** | **744,496/s** | **815,817/s** | **817,494/s** ✅ |
-
-</details>
-
-### Cold vs Warm Cache (Windows SSD)
-
-> Cold = first run after reboot. Warm = OS has cached metadata in RAM.
-
-On SSD, cold and warm are nearly identical — NTFS caches metadata aggressively. The real bottleneck on Windows is the filesystem stack, not the drive.
-
----
-
-## 🐧 Linux — Ryzen 7 5825U, CachyOS, NVMe
-
-| Component | Spec |
-|-----------|------|
-| **CPU** | AMD Ryzen 7 5825U (8 cores / 16 threads, mobile) |
-| **RAM** | 16GB |
-| **OS** | CachyOS (BORE scheduler) |
-| **Storage** | NVMe SSD (475GB) |
-
-> 10 warm runs per configuration.
-
-### Thread Scaling — `/home/dylan` (106k entries — Home Folder)
-
-| Threads | Warm Avg | Warm Median | Efficiency |
-|---------|----------|-------------|------------|
-| 1 | 999,432/s | 1,000,164/s | 100% |
-| 2 | 1,812,474/s | 1,813,606/s | 91% |
-| 4 | 3,334,043/s | 3,334,091/s | 83% |
-| 6 | 4,130,872/s | 4,057,115/s | 68% |
-| 8 | 5,000,375/s | 4,981,887/s | 62% |
-| 10 | 5,260,197/s | 5,355,170/s | 54% |
-| 12 | 5,593,996/s | 5,715,085/s | 48% |
-| 14 | 5,658,490/s | 5,718,812/s | 41% |
-| **16** | **5,902,959/s** | **6,026,774/s** | 38% ✅ |
-
-### Thread Scaling — `/usr` (System Dirs)
-
-| Threads | Warm Avg | Warm Median |
-|---------|----------|-------------|
-| 1 | 1,200,595/s | 1,203,551/s |
-| 4 | 3,828,810/s | 3,857,702/s |
-| 8 | 5,566,237/s | 5,494,850/s |
-| 12 | 5,784,335/s | 5,771,879/s |
-| **16** | **6,274,455/s** | **6,211,923/s** ✅ |
-
-> **Peak recorded: 7,065,858 entries/s** @ 16t on `/usr`
-
----
-
-## ⚡ Linux vs Windows
-
-| Metric | Windows (i5-13400F) | Linux (Ryzen 7 5825U) | Ratio |
-|--------|--------------------|-----------------------|-------|
-| Peak speed | 1,641,700/s | 7,065,858/s | **4.3x** |
-| 16t home dir | ~685,000/s | 6,026,774/s | **8.8x** |
-| Single thread | ~148,000/s | 1,000,164/s | **6.8x** |
-| Cold full drive | ~94,000/s | 5,272,431/s | **56x** |
-
-> Linux cold cache is faster than Windows warm cache. The gap is almost entirely the Windows filesystem stack (NTFS + Defender), not the CPU. These Linux numbers are from a **mobile** chip — desktop results pending.
+> C:\ peaks at t=12 then drops — more threads causes contention on a large, deeply nested NTFS drive.
 
 ---
 
 ## 💡 Thread Recommendations
 
-| Dataset | Real-world example | Recommended threads |
-|---------|--------------------|---------------------|
-| < 100k entries | Project folder, app installs | 16 |
-| 100k–500k entries | Home directory | 10–12 |
-| 500k+ entries | Full OS drive | 10 |
+| Dataset size | Real-world example | Recommended |
+|-------------|-------------------|-------------|
+| < 100k entries | App installs, project folder | t=16 |
+| 100k–500k entries | Home directory | t=10–12 |
+| 500k+ entries | Full OS drive | t=10–12 |
 
-> Use `-t N` to set thread count manually and `-S` to see your speed.
+Use `-t N` to set thread count and `-S` to see your speed.
 
 ---
 
-## 🖴 HDD / External Drives
+## 🐧 Linux Benchmarks
 
-Performance varies heavily by drive age, fragmentation, and fill level. If you have HDD benchmark results, run `./scripts/benchmark.sh` and open a PR with your CSV!
+*Contributions welcome! Run `./scripts/dev.sh benchmark` and open a PR with the `.md` output.*
 
 ---
 
 ## 🍎 macOS Benchmarks
 
-*Coming soon — contributions welcome! Run `./scripts/benchmark.sh` and open an issue with your results.*
+*Contributions welcome! Run `./scripts/dev.sh benchmark` and open a PR with the `.md` output.*
+
+---
+
+## 🖴 HDD / External Drives
+
+Performance varies heavily by drive age and fragmentation. HDD benchmark contributions especially welcome.

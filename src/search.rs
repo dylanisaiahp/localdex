@@ -1,28 +1,9 @@
-use aho_corasick::AhoCorasick;
-use colored::Colorize;
-use ignore::{DirEntry, WalkBuilder, WalkState};
-use std::ffi::OsStr;
 use std::path::PathBuf;
-use std::sync::atomic::{AtomicUsize, Ordering};
-use std::sync::{Arc, Mutex};
-use std::time::Instant;
+use std::time::Duration;
 
-// ---------------------------------------------------------------------------
-// Runtime config
-// ---------------------------------------------------------------------------
+use parex::Matcher;
 
-pub struct Config {
-    pub case_sensitive: bool,
-    pub quiet: bool,
-    pub all: bool,
-    pub dirs_only: bool,
-    pub extension: Option<String>,
-    pub matcher: Option<AhoCorasick>,
-    pub limit: Option<usize>,
-    pub threads: usize,
-    pub collect_paths: bool,
-    pub exclude: Vec<String>,
-}
+use crate::source::DirectorySource;
 
 // ---------------------------------------------------------------------------
 // Scan result
@@ -32,224 +13,167 @@ pub struct ScanResult {
     pub matches: usize,
     pub files: usize,
     pub dirs: usize,
-    pub duration: std::time::Duration,
+    pub duration: Duration,
     pub paths: Vec<PathBuf>,
 }
 
 // ---------------------------------------------------------------------------
-// Shared match handler — called when an entry matches the search criteria.
-//
-// Increments the match counter, enforces the limit (two-guard approach to
-// handle the race condition where multiple threads overshoot before
-// WalkState::Quit propagates), collects the path, and prints the result.
-//
-// `suppress_output` — true when -a/--all-files is active (file mode only;
-// we still count but never print individual filenames in -a mode).
+// Search config
 // ---------------------------------------------------------------------------
 
-struct MatchCtx<'a> {
-    matches: &'a Arc<AtomicUsize>,
-    paths: &'a Arc<Mutex<Vec<PathBuf>>>,
-    limit: Option<usize>,
-    collect_paths: bool,
-    quiet: bool,
-    suppress_output: bool,
-    scan_dir: &'a PathBuf,
+pub struct Config {
+    pub case_sensitive: bool,
+    pub quiet: bool,
+    pub all: bool,
+    pub dirs_only: bool,
+    pub extension: Option<String>,
+    pub pattern: Option<String>,
+    pub limit: Option<usize>,
+    pub threads: usize,
+    pub collect_paths: bool,
+    pub exclude: Vec<String>,
 }
 
-fn handle_match(entry: &DirEntry, ctx: &MatchCtx<'_>) -> WalkState {
-    let mc = ctx.matches.fetch_add(1, Ordering::Relaxed) + 1;
+// ---------------------------------------------------------------------------
+// Matchers
+// ---------------------------------------------------------------------------
 
-    // Early guard: quit before printing/collecting if already over limit
-    if let Some(lim) = ctx.limit
-        && mc > lim
-    {
-        return WalkState::Quit;
-    }
+/// Matches files by name substring (case-insensitive or sensitive).
+struct NameMatcher {
+    pattern: String,
+    case_sensitive: bool,
+}
 
-    if ctx.collect_paths
-        && let Ok(mut p) = ctx.paths.lock()
-    {
-        p.push(entry.path().to_path_buf());
-    }
-
-    if !ctx.quiet && !ctx.suppress_output {
-        let rel = entry
-            .path()
-            .strip_prefix(ctx.scan_dir)
-            .unwrap_or(entry.path());
-        let disp = if rel.as_os_str().is_empty() {
-            ".".to_string()
+impl Matcher for NameMatcher {
+    fn is_match(&self, entry: &parex::Entry) -> bool {
+        if self.case_sensitive {
+            entry.name.contains(&self.pattern)
         } else {
-            rel.to_string_lossy().into_owned()
-        };
-        println!("{}", disp.bright_cyan());
+            entry
+                .name
+                .to_lowercase()
+                .contains(&self.pattern.to_lowercase())
+        }
     }
+}
 
-    // At-limit guard: quit after printing if we've hit the limit exactly
-    if let Some(lim) = ctx.limit
-        && mc >= lim
-    {
-        return WalkState::Quit;
+/// Matches files by extension.
+struct ExtMatcher {
+    ext: String,
+    case_sensitive: bool,
+}
+
+impl Matcher for ExtMatcher {
+    fn is_match(&self, entry: &parex::Entry) -> bool {
+        entry.path.extension().is_some_and(|e| {
+            if self.case_sensitive {
+                e == std::ffi::OsStr::new(&self.ext)
+            } else {
+                e.eq_ignore_ascii_case(std::ffi::OsStr::new(&self.ext))
+            }
+        })
     }
+}
 
-    WalkState::Continue
+/// Matches everything — used for -a/--all-files.
+struct AllMatcher;
+
+impl Matcher for AllMatcher {
+    fn is_match(&self, entry: &parex::Entry) -> bool {
+        matches!(entry.kind, parex::EntryKind::File)
+    }
+}
+
+/// Matches directories only.
+struct DirMatcher {
+    pattern: Option<String>,
+    case_sensitive: bool,
+}
+
+impl Matcher for DirMatcher {
+    fn is_match(&self, entry: &parex::Entry) -> bool {
+        if !matches!(entry.kind, parex::EntryKind::Dir) {
+            return false;
+        }
+        match &self.pattern {
+            None => true,
+            Some(pat) => {
+                if self.case_sensitive {
+                    entry.name.contains(pat)
+                } else {
+                    entry.name.to_lowercase().contains(&pat.to_lowercase())
+                }
+            }
+        }
+    }
 }
 
 // ---------------------------------------------------------------------------
-// Single drive/directory scan
+// scan_dir — thin wrapper around parex::search()
 // ---------------------------------------------------------------------------
 
 pub fn scan_dir(dir: &PathBuf, config: &Config) -> ScanResult {
-    let mut builder = WalkBuilder::new(dir);
-    builder
-        .standard_filters(false)
-        .ignore(false)
-        .parents(false)
-        .hidden(false)
-        .follow_links(false)
-        .same_file_system(false)
-        .threads(config.threads);
+    let source = DirectorySource::new(dir)
+        .exclude(config.exclude.clone())
+        .dirs_only(config.dirs_only)
+        .follow_links(false);
 
-    let walker = builder.build_parallel();
+    let mut builder = parex::search()
+        .source(source)
+        .threads(config.threads)
+        .collect_paths(config.collect_paths)
+        .collect_errors(false);
 
-    let matches = Arc::new(AtomicUsize::new(0));
-    let files = Arc::new(AtomicUsize::new(0));
-    let dirs_count = Arc::new(AtomicUsize::new(0));
-    let paths: Arc<Mutex<Vec<PathBuf>>> = Arc::new(Mutex::new(Vec::new()));
+    if let Some(lim) = config.limit {
+        builder = builder.limit(lim);
+    }
 
-    let start = Instant::now();
+    // Wire up the right matcher
+    let result = if config.all {
+        builder.with_matcher(AllMatcher).run()
+    } else if config.dirs_only {
+        builder
+            .with_matcher(DirMatcher {
+                pattern: config.pattern.clone(),
+                case_sensitive: config.case_sensitive,
+            })
+            .run()
+    } else if let Some(ext) = &config.extension {
+        builder
+            .with_matcher(ExtMatcher {
+                ext: ext.clone(),
+                case_sensitive: config.case_sensitive,
+            })
+            .run()
+    } else {
+        builder
+            .with_matcher(NameMatcher {
+                pattern: config.pattern.clone().unwrap_or_default(),
+                case_sensitive: config.case_sensitive,
+            })
+            .run()
+    };
 
-    walker.run(|| {
-        let ext = config.extension.clone();
-        let all = config.all;
-        let dirs_only = config.dirs_only;
-        let case_sensitive = config.case_sensitive;
-        let quiet = config.quiet;
-        let collect_paths = config.collect_paths;
-        let scan_dir = dir.clone();
-        let matcher = config.matcher.clone();
-        let excluded_dirs = config.exclude.clone();
-        let matches = Arc::clone(&matches);
-        let files = Arc::clone(&files);
-        let dirs_count = Arc::clone(&dirs_count);
-        let paths = Arc::clone(&paths);
-        let limit = config.limit;
+    let result = result.expect("parex search failed");
 
-        Box::new(move |res: Result<DirEntry, _>| -> WalkState {
-            let entry = match res {
-                Ok(e) => e,
-                Err(_) => return WalkState::Continue,
-            };
-
-            let ft = match entry.file_type() {
-                Some(ft) => ft,
-                None => return WalkState::Continue,
-            };
-
-            if ft.is_dir() {
-                dirs_count.fetch_add(1, Ordering::Relaxed);
-
-                // Skip excluded directories
-                let dir_name = entry.file_name().to_string_lossy();
-                if excluded_dirs
-                    .iter()
-                    .any(|ex| dir_name.as_ref() == ex.as_str())
-                {
-                    return WalkState::Skip;
-                }
-
-                if dirs_only && entry.depth() > 0 {
-                    let matched = matcher
-                        .as_ref()
-                        .is_none_or(|m| m.is_match(entry.file_name().to_string_lossy().as_ref()));
-
-                    if matched {
-                        return handle_match(
-                            &entry,
-                            &MatchCtx {
-                                matches: &matches,
-                                paths: &paths,
-                                limit,
-                                collect_paths,
-                                quiet,
-                                suppress_output: false, // dirs are never suppressed
-                                scan_dir: &scan_dir,
-                            },
-                        );
-                    }
-                }
-
-                return WalkState::Continue;
-            }
-
-            if !ft.is_file() {
-                return WalkState::Continue;
-            }
-
-            files.fetch_add(1, Ordering::Relaxed);
-
-            if dirs_only {
-                return WalkState::Continue;
-            }
-
-            let matched = if all {
-                true
-            } else if let Some(ref ext) = ext {
-                entry.path().extension().is_some_and(|e| {
-                    if case_sensitive {
-                        e == OsStr::new(ext)
-                    } else {
-                        e.eq_ignore_ascii_case(OsStr::new(ext))
-                    }
-                })
-            } else if let Some(ref m) = matcher {
-                m.is_match(entry.file_name().to_string_lossy().as_ref())
+    // Print matches as we go — parex doesn't handle output, we do
+    if !config.quiet && !config.all {
+        for path in &result.paths {
+            let rel = path.strip_prefix(dir).unwrap_or(path);
+            let disp = if rel.as_os_str().is_empty() {
+                ".".to_string()
             } else {
-                false
+                rel.to_string_lossy().into_owned()
             };
-
-            if matched {
-                return handle_match(
-                    &entry,
-                    &MatchCtx {
-                        matches: &matches,
-                        paths: &paths,
-                        limit,
-                        collect_paths,
-                        quiet,
-                        suppress_output: all, // suppress individual output in -a mode
-                        scan_dir: &scan_dir,
-                    },
-                );
-            }
-
-            WalkState::Continue
-        })
-    });
-
-    let collected_paths = Arc::try_unwrap(paths)
-        .unwrap_or_default()
-        .into_inner()
-        .unwrap_or_default();
+            println!("{}", colored::Colorize::bright_cyan(disp.as_str()));
+        }
+    }
 
     ScanResult {
-        matches: matches.load(Ordering::Relaxed),
-        files: files.load(Ordering::Relaxed),
-        dirs: dirs_count.load(Ordering::Relaxed),
-        duration: start.elapsed(),
-        paths: collected_paths,
+        matches: result.matches,
+        files: result.stats.files,
+        dirs: result.stats.dirs,
+        duration: result.stats.duration,
+        paths: result.paths,
     }
-}
-
-// ---------------------------------------------------------------------------
-// Windows: enumerate all drives
-// ---------------------------------------------------------------------------
-
-#[cfg(windows)]
-pub fn get_all_drives() -> Vec<PathBuf> {
-    ('A'..='Z')
-        .map(|c| PathBuf::from(format!("{}:\\", c)))
-        .filter(|p| p.exists())
-        .collect()
 }

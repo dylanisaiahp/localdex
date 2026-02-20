@@ -40,8 +40,8 @@ pub struct ParsedFlags {
 pub fn expand_aliases(args: Vec<String>, config: &LdxConfig) -> Vec<String> {
     args.into_iter()
         .flat_map(|arg| {
-            if let Some(alias_value) = config.aliases.get(&arg) {
-                alias_value
+            if let Some(expansion) = config.aliases.get(&arg) {
+                expansion
                     .split_whitespace()
                     .map(|s| s.to_string())
                     .collect()
@@ -68,7 +68,6 @@ pub fn resolve_custom(args: Vec<String>, config: &LdxConfig) -> Vec<String> {
 
             if *arg == short || *arg == long {
                 if let (Some(action), Some(target)) = (&custom.action, &custom.target) {
-                    // Find the built-in flag that corresponds to this custom flag's target
                     let find_flag = || {
                         config
                             .flags
@@ -114,7 +113,7 @@ pub fn resolve_custom(args: Vec<String>, config: &LdxConfig) -> Vec<String> {
 // Helpers
 // ---------------------------------------------------------------------------
 
-/// Look up the short/long flag names for a given target in config.
+/// Look up short/long flag names for a given target in config.
 fn get_flag_names(config: &LdxConfig, target: &str) -> (String, String) {
     config
         .flags
@@ -130,33 +129,14 @@ fn flag_matches(arg: &str, short: &str, long: &str) -> bool {
 }
 
 // ---------------------------------------------------------------------------
-// Parse args
+// Management flags (early exit)
 // ---------------------------------------------------------------------------
 
-pub fn parse_args(config: &LdxConfig) -> Result<ParsedFlags> {
-    let raw: Vec<String> = std::env::args().skip(1).collect();
-    let raw = expand_aliases(raw, config);
-    let raw = resolve_custom(raw, config);
-
-    let max_threads = num_cpus::get();
-
+fn parse_management(raw: &[String], config: &LdxConfig) -> Option<ParsedFlags> {
     let (help_s, help_l) = get_flag_names(config, "help");
-    let (quiet_s, quiet_l) = get_flag_names(config, "quiet");
-    let (stats_s, stats_l) = get_flag_names(config, "stats");
-    let (all_s, all_l) = get_flag_names(config, "all");
-    let (verbose_s, verbose_l) = get_flag_names(config, "verbose");
-    let (first_s, first_l) = get_flag_names(config, "first");
-    let (open_s, open_l) = get_flag_names(config, "open");
-    let (dirs_s, dirs_l) = get_flag_names(config, "dirs_only");
-    let (where_s, where_l) = get_flag_names(config, "where_mode");
-    let (drives_s, drives_l) = get_flag_names(config, "all_drives");
-    let (ext_s, ext_l) = get_flag_names(config, "extension");
-    let (dir_s, dir_l) = get_flag_names(config, "dir");
-    let (threads_s, threads_l) = get_flag_names(config, "threads");
-    let (limit_s, limit_l) = get_flag_names(config, "limit");
-    let (cs_s, cs_l) = get_flag_names(config, "case_sensitive");
-
-    // ── Management flags (early exit) ────────────────────────────────────────
+    let max_threads = std::thread::available_parallelism()
+        .map(|n| n.get())
+        .unwrap_or(4);
 
     let show_help = raw
         .iter()
@@ -176,7 +156,7 @@ pub fn parse_args(config: &LdxConfig) -> Result<ParsedFlags> {
         || sync_config
         || reset_config
     {
-        return Ok(ParsedFlags {
+        return Some(ParsedFlags {
             show_help,
             show_version,
             show_config,
@@ -190,35 +170,45 @@ pub fn parse_args(config: &LdxConfig) -> Result<ParsedFlags> {
         });
     }
 
-    // ── Value flags (need the next arg) ──────────────────────────────────────
+    None
+}
 
-    // Built once, used for both pattern extraction and unknown flag validation
-    let value_flags = [
-        ext_s.as_str(),
-        ext_l.as_str(),
-        dir_s.as_str(),
-        dir_l.as_str(),
-        threads_s.as_str(),
-        threads_l.as_str(),
-        limit_s.as_str(),
-        limit_l.as_str(),
-        "--exclude",
-    ];
+// ---------------------------------------------------------------------------
+// Value flags (flags that consume the next arg)
+// ---------------------------------------------------------------------------
 
-    let extension: Option<String> = raw
+struct ValueFlags {
+    extension: Option<String>,
+    dir: PathBuf,
+    threads: usize,
+    limit: Option<usize>,
+    exclude: Vec<String>,
+}
+
+fn parse_value_flags(raw: &[String], config: &LdxConfig) -> ValueFlags {
+    let max_threads = std::thread::available_parallelism()
+        .map(|n| n.get())
+        .unwrap_or(4);
+
+    let (ext_s, ext_l) = get_flag_names(config, "extension");
+    let (dir_s, dir_l) = get_flag_names(config, "dir");
+    let (threads_s, threads_l) = get_flag_names(config, "threads");
+    let (limit_s, limit_l) = get_flag_names(config, "limit");
+
+    let extension = raw
         .iter()
         .position(|a| flag_matches(a, &ext_s, &ext_l))
         .and_then(|i| raw.get(i + 1))
         .map(|s| s.trim_start_matches('.').to_lowercase());
 
-    let dir: PathBuf = raw
+    let dir = raw
         .iter()
         .position(|a| flag_matches(a, &dir_s, &dir_l))
         .and_then(|i| raw.get(i + 1))
         .map(PathBuf::from)
         .unwrap_or_else(|| ".".into());
 
-    let threads: usize = raw
+    let threads = raw
         .iter()
         .position(|a| flag_matches(a, &threads_s, &threads_l))
         .and_then(|i| raw.get(i + 1))
@@ -236,30 +226,56 @@ pub fn parse_args(config: &LdxConfig) -> Result<ParsedFlags> {
         })
         .unwrap_or(max_threads);
 
-    let limit: Option<usize> = raw
+    let limit = raw
         .iter()
         .position(|a| flag_matches(a, &limit_s, &limit_l))
         .and_then(|i| raw.get(i + 1))
         .and_then(|v| v.parse().ok());
 
-    let exclude: Vec<String> = raw
+    let exclude = raw
         .iter()
         .position(|a| a == "--exclude")
         .and_then(|i| raw.get(i + 1))
         .map(|s| s.split(',').map(|p| p.trim().to_string()).collect())
         .unwrap_or_default();
 
-    // ── Boolean flags ─────────────────────────────────────────────────────────
+    ValueFlags {
+        extension,
+        dir,
+        threads,
+        limit,
+        exclude,
+    }
+}
 
-    let quiet = raw.iter().any(|a| flag_matches(a, &quiet_s, &quiet_l));
-    let stats = raw.iter().any(|a| flag_matches(a, &stats_s, &stats_l));
-    let all = raw.iter().any(|a| flag_matches(a, &all_s, &all_l));
-    let verbose = raw.iter().any(|a| flag_matches(a, &verbose_s, &verbose_l));
-    let first = raw.iter().any(|a| flag_matches(a, &first_s, &first_l));
-    let open = raw.iter().any(|a| flag_matches(a, &open_s, &open_l));
-    let dirs_only = raw.iter().any(|a| flag_matches(a, &dirs_s, &dirs_l));
-    let where_mode = raw.iter().any(|a| flag_matches(a, &where_s, &where_l));
-    let case_sensitive = raw.iter().any(|a| flag_matches(a, &cs_s, &cs_l));
+// ---------------------------------------------------------------------------
+// Boolean flags
+// ---------------------------------------------------------------------------
+
+struct BoolFlags {
+    quiet: bool,
+    stats: bool,
+    all: bool,
+    verbose: bool,
+    first: bool,
+    open: bool,
+    dirs_only: bool,
+    where_mode: bool,
+    case_sensitive: bool,
+    all_drives: bool,
+}
+
+fn parse_bool_flags(raw: &[String], config: &LdxConfig) -> BoolFlags {
+    let (quiet_s, quiet_l) = get_flag_names(config, "quiet");
+    let (stats_s, stats_l) = get_flag_names(config, "stats");
+    let (all_s, all_l) = get_flag_names(config, "all");
+    let (verbose_s, verbose_l) = get_flag_names(config, "verbose");
+    let (first_s, first_l) = get_flag_names(config, "first");
+    let (open_s, open_l) = get_flag_names(config, "open");
+    let (dirs_s, dirs_l) = get_flag_names(config, "dirs_only");
+    let (where_s, where_l) = get_flag_names(config, "where_mode");
+    let (cs_s, cs_l) = get_flag_names(config, "case_sensitive");
+    let (drives_s, drives_l) = get_flag_names(config, "all_drives");
 
     #[cfg(windows)]
     let all_drives = raw.iter().any(|a| flag_matches(a, &drives_s, &drives_l));
@@ -269,7 +285,42 @@ pub fn parse_args(config: &LdxConfig) -> Result<ParsedFlags> {
         false
     };
 
-    // ── Pattern extraction + unknown flag validation (single pass) ────────────
+    BoolFlags {
+        quiet: raw.iter().any(|a| flag_matches(a, &quiet_s, &quiet_l)),
+        stats: raw.iter().any(|a| flag_matches(a, &stats_s, &stats_l)),
+        all: raw.iter().any(|a| flag_matches(a, &all_s, &all_l)),
+        verbose: raw.iter().any(|a| flag_matches(a, &verbose_s, &verbose_l)),
+        first: raw.iter().any(|a| flag_matches(a, &first_s, &first_l)),
+        open: raw.iter().any(|a| flag_matches(a, &open_s, &open_l)),
+        dirs_only: raw.iter().any(|a| flag_matches(a, &dirs_s, &dirs_l)),
+        where_mode: raw.iter().any(|a| flag_matches(a, &where_s, &where_l)),
+        case_sensitive: raw.iter().any(|a| flag_matches(a, &cs_s, &cs_l)),
+        all_drives,
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Pattern extraction + unknown flag validation
+// ---------------------------------------------------------------------------
+
+fn parse_pattern(raw: &[String], config: &LdxConfig) -> Result<Option<String>> {
+    let value_flag_names: Vec<String> = {
+        let (ext_s, ext_l) = get_flag_names(config, "extension");
+        let (dir_s, dir_l) = get_flag_names(config, "dir");
+        let (threads_s, threads_l) = get_flag_names(config, "threads");
+        let (limit_s, limit_l) = get_flag_names(config, "limit");
+        vec![
+            ext_s,
+            ext_l,
+            dir_s,
+            dir_l,
+            threads_s,
+            threads_l,
+            limit_s,
+            limit_l,
+            "--exclude".into(),
+        ]
+    };
 
     let known_flags: Vec<String> = config
         .flags
@@ -295,12 +346,12 @@ pub fn parse_args(config: &LdxConfig) -> Result<ParsedFlags> {
     let mut pattern: Option<String> = None;
     let mut skip_next = false;
 
-    for arg in &raw {
+    for arg in raw {
         if skip_next {
             skip_next = false;
             continue;
         }
-        if value_flags.contains(&arg.as_str()) {
+        if value_flag_names.contains(arg) {
             skip_next = true;
             continue;
         }
@@ -313,8 +364,22 @@ pub fn parse_args(config: &LdxConfig) -> Result<ParsedFlags> {
         }
     }
 
-    // ── Validate flag combinations ────────────────────────────────────────────
+    Ok(pattern)
+}
 
+// ---------------------------------------------------------------------------
+// Validate flag combinations
+// ---------------------------------------------------------------------------
+
+fn validate_combos(
+    pattern: &Option<String>,
+    extension: &Option<String>,
+    first: bool,
+    limit: Option<usize>,
+    all: bool,
+    open: bool,
+    dirs_only: bool,
+) -> Result<()> {
     if first && limit.is_some() {
         bail!("-1/--first and -L/--limit cannot be used together.");
     }
@@ -338,31 +403,65 @@ pub fn parse_args(config: &LdxConfig) -> Result<ParsedFlags> {
             "Either a pattern, -e/--extension, or -a/--all-files is required. Run with --help for usage."
         );
     }
+    Ok(())
+}
 
-    let limit = if first || where_mode { Some(1) } else { limit };
+// ---------------------------------------------------------------------------
+// parse_args — orchestration
+// ---------------------------------------------------------------------------
+
+pub fn parse_args(config: &LdxConfig) -> Result<ParsedFlags> {
+    let raw: Vec<String> = std::env::args().skip(1).collect();
+    let raw = expand_aliases(raw, config);
+    let raw = resolve_custom(raw, config);
+
+    // Early exit for management flags
+    if let Some(flags) = parse_management(&raw, config) {
+        return Ok(flags);
+    }
+
+    let v = parse_value_flags(&raw, config);
+    let b = parse_bool_flags(&raw, config);
+    let pattern = parse_pattern(&raw, config)?;
+
+    validate_combos(
+        &pattern,
+        &v.extension,
+        b.first,
+        v.limit,
+        b.all,
+        b.open,
+        b.dirs_only,
+    )?;
+
+    let limit = if b.first || b.where_mode {
+        Some(1)
+    } else {
+        v.limit
+    };
 
     Ok(ParsedFlags {
         pattern,
-        dir,
-        extension,
-        threads,
-        quiet,
-        stats,
-        all,
-        verbose,
-        open,
-        dirs_only,
-        where_mode,
-        all_drives,
-        case_sensitive,
+        dir: v.dir,
+        extension: v.extension,
+        threads: v.threads,
+        quiet: b.quiet,
+        stats: b.stats,
+        all: b.all,
+        verbose: b.verbose,
+        open: b.open,
+        dirs_only: b.dirs_only,
+        where_mode: b.where_mode,
+        all_drives: b.all_drives,
+        case_sensitive: b.case_sensitive,
         limit,
-        exclude,
-        show_help,
-        show_version,
-        show_config,
-        edit_config,
-        check_config,
-        sync_config,
-        reset_config,
+        exclude: v.exclude,
+        show_help: false,
+        show_version: false,
+        show_config: false,
+        edit_config: false,
+        check_config: false,
+        sync_config: false,
+        reset_config: false,
     })
 }
