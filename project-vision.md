@@ -142,7 +142,7 @@ Accessibility. CSS themes need zero code. Python/JS covers most devs. Rust for p
 - ROADMAP/CHANGELOG split into separate files
 
 ### v0.2.0 ✓ Shipped
-- parex v0.1.0 published to crates.io
+- parex v0.1.0 + v0.2.0 published to crates.io
 - `DirectorySource` + parex integration
 - `config.rs` split, `default_config.toml` extracted
 - `flags.rs` refactored into focused helpers
@@ -157,6 +157,8 @@ Accessibility. CSS themes need zero code. Python/JS covers most devs. Rust for p
 - Integration tests — full search round-trips using `DirectorySource`
 - `benches/` with Criterion in parex — baseline throughput measurements
 - parex: `collect_errors` stress test with permission-denied directories
+- `--warn` flag — surface recoverable errors skipped during scan (permission denied, not found)
+- GitHub Actions — automated pre-built binary releases on tag push (no manual release pages)
 
 ### v0.4.0 — parex v0.2.0
 - True parallel matching — engine distributes match work across threads
@@ -183,13 +185,23 @@ Zero code, just config files. Catppuccin, Nord, Dracula, Tokyo Night, Gruvbox.
 Simple data enrichment, CLI command triggers (`!`, `:`, `>`, `?`). ~200KB runtime.
 
 ### Tier 3 — Web Dev Friendly (JS/TS via Deno)
-Familiar to most devs, moderate complexity plugins.
+Familiar to most devs, moderate complexity plugins. Custom GUI allowed — JS devs expect to build UIs.
 
 ### Tier 4 — Power Integrations (Python/Go/C# via WASM or native)
-External API calls (Steam, VirusTotal), heavy processing.
+External API calls (Steam, VirusTotal), heavy processing. Custom GUI allowed — e.g. Spotify sidebar, log panel.
 
 ### Tier 5 — Full System Access (Rust)
-Replace backend parex if desired. Deepest API access.
+Replace backend parex if desired. Deepest API access. Custom GUI allowed.
+
+**GUI modes:** Each plugin declares which modes it supports:
+```toml
+[plugin]
+name = "spotify"
+tier = 3
+ui_modes = ["aesthetic", "advanced", "both"]
+custom_gui = true
+```
+Tiers 1–2 provide CSS/data only — the shell renders them. Tiers 3–5 can own their pane entirely.
 
 **Plugin priorities:** Weighting system so heavy plugins don't block light ones. UI shows "heavy plugin active" badge during execution.
 

@@ -319,12 +319,13 @@ generate_config() {
         default_toml="$dest_dir/default_config.toml"
     fi
 
-    if [ -n "$default_toml" ]; then
+    if [ -f "$config_file" ]; then
+        echo -e "${GREEN}✓ config.toml already present — skipping (aliases preserved)${RESET}"
+    elif [ -n "$default_toml" ]; then
         cp "$default_toml" "$config_file"
         echo -e "${GREEN}✓ Generated config.toml from default_config.toml${RESET}"
     else
-        echo -e "${YELLOW}⚠ default_config.toml not found — skipping config generation${RESET}"
-        echo -e "${YELLOW}  Run: ldx --sync  after install to restore defaults${RESET}"
+        echo -e "${YELLOW}⚠ default_config.toml not found — run ldx --sync after install${RESET}"
     fi
 }
 

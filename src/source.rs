@@ -149,14 +149,14 @@ fn map_ignore_error(e: ignore::Error) -> ParexError {
                     }
                 }
             }
-            _ => ParexError::Source(err.to_string()),
+            _ => ParexError::source_err(err),
         },
         ignore::Error::Loop { child, .. } => ParexError::SymlinkLoop(child),
         ignore::Error::Io(io_err) => ParexError::Io {
             path: PathBuf::new(),
             source: io_err,
         },
-        other => ParexError::Source(other.to_string()),
+        other => ParexError::source_err(other),
     }
 }
 

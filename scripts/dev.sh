@@ -174,12 +174,14 @@ cmd_build() {
     echo -e "${GREEN}✓ Binary installed: ${DEST}/${BINARY_NAME}${RESET}"
     echo -e "${GREEN}✓ Alias installed:  ${DEST}/${ALIAS_NAME}${RESET}"
 
-    # Generate config.toml from default_config.toml
-    if [ -f "default_config.toml" ]; then
+    # Generate config.toml from default_config.toml (only if none exists yet)
+    if [ -f "$DEST/config.toml" ]; then
+        echo -e "${GREEN}✓ config.toml already present — skipping (aliases preserved)${RESET}"
+    elif [ -f "default_config.toml" ]; then
         cp "default_config.toml" "$DEST/config.toml"
         echo -e "${GREEN}✓ config.toml generated from default_config.toml${RESET}"
-    elif [ -f "$DEST/config.toml" ]; then
-        echo -e "${GREEN}✓ config.toml already present — skipping${RESET}"
+    else
+        echo -e "${YELLOW}⚠ default_config.toml not found — run ldx --sync after install${RESET}"
     fi
 
     # PATH setup
