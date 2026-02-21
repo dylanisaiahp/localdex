@@ -98,6 +98,15 @@ impl Source for DirectorySource {
                         if exclude.iter().any(|ex| name.as_ref() == ex.as_str()) {
                             return WalkState::Skip;
                         }
+                        // Probe directory readability — ignore swallows permission
+                        // errors before our closure sees them, so we check manually
+                        if let Err(e) = std::fs::read_dir(entry.path())
+                            && e.kind() == std::io::ErrorKind::PermissionDenied
+                        {
+                            let _ = tx.send(Err(ParexError::PermissionDenied(
+                                entry.path().to_path_buf(),
+                            )));
+                        }
                     }
 
                     // In dirs_only mode, skip files entirely

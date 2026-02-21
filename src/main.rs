@@ -9,11 +9,14 @@ mod source;
 use anyhow::Result;
 use dirs::home_dir;
 use std::path::PathBuf;
-use std::time::Instant;
 
 use config::{check_config, config_path, load_config, reset_config, sync_config};
 use colored::Colorize;
-use display::{fmt_num, print_help, print_result, print_stats};
+#[cfg(windows)]
+use std::time::Instant;
+use display::{print_help, print_result, print_stats};
+#[cfg(windows)]
+use display::fmt_num;
 use flags::{ParsedFlags, parse_args};
 use launcher::{open_file, prompt_and_open};
 use search::{Config, ScanResult, scan_dir};
