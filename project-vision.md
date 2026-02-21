@@ -1,7 +1,7 @@
 # Project Vision: parex / ldx / parallax
 
 **Last Updated:** 2026-02-21  
-**Current Version:** v0.2.0 (ldx on parex engine) ✓ Shipped
+**Current Version:** ldx v0.2.0 · parex v0.2.1
 
 ---
 
@@ -17,7 +17,7 @@ Build a blazing-fast parallel search framework (parex) with a clean CLI (ldx) an
 - **Not just files:** Can search anything traversable (posts, products, DB records, file systems)
 - **Zero opinions:** No file-system logic in core — that's for wrappers
 - **API:** `Source` + `Matcher` traits, `SearchBuilder` fluent API
-- **Status:** v0.1.0 published to crates.io ✓
+- **Status:** v0.2.1 published to crates.io ✓
 
 ### ldx (CLI)
 - **What:** File search CLI built on parex
@@ -25,15 +25,16 @@ Build a blazing-fast parallel search framework (parex) with a clean CLI (ldx) an
 - **Repo:** `localdex` (existing) — no repo rename needed
 - **crates.io:** Not published — binary only, installed via install.sh
 - **Philosophy:** Config-driven everything, zero hardcoded behavior
-- **Status:** v0.2.0 — first version running on parex engine ✓
+- **Status:** v0.2.0 — running on parex engine ✓
 
 ### parallax (GUI)
-- **What:** Spotlight/Raycast style desktop app (Tauri + Rust)
+- **What:** Spotlight/Raycast style desktop app (Tauri + Svelte)
 - **UX:** Borderless, dynamic height, real-time streaming results (NO loading spinners)
 - **UX note:** ~50ms debounce on first keystrokes when cold to avoid flicker on slow drives
 - **Scope:** $HOME by default (not full drives — speed over completeness)
-- **Plugins:** 5-tier system (CSS themes → Lua → JS → Python/compiled → Rust)
-- **Status:** Mockup complete, development pending parex/ldx stable
+- **Default accent:** Blue — user-configurable, ~30 shipped colors, plugin-extensible
+- **Plugins:** 5-tier system (CSS themes → Lua → JS → Python → Rust)
+- **Status:** Mockup complete (`parallax-mockup.html` in localdex repo), development pending ldx/parex ~0.5.0
 
 ### parafetch (future)
 - **What:** neofetch/fastfetch alternative using parex for file counts
@@ -41,7 +42,7 @@ Build a blazing-fast parallel search framework (parex) with a clean CLI (ldx) an
 
 ### Enscribe (distant future)
 - **What:** Cross-platform notes app for scripture/prayers/journaling
-- **Status:** Standalone passion project, optional Parallax integration (keep optional)
+- **Status:** Standalone passion project (currently Flutter), Rust/Tauri rewrite planned post-parallax
 
 ---
 
@@ -50,8 +51,6 @@ Build a blazing-fast parallel search framework (parex) with a clean CLI (ldx) an
 - **parex** = parallel executor/explorer — crates.io library ✓
 - **ldx** = CLI binary — permanent name, localdex repo stays as-is ✓
 - **parallax** = GUI — new repo when the time comes
-
-No CLI rename. `ldx` is already in users' PATH, has brand recognition, and conflicts with nothing.
 
 ---
 
@@ -69,7 +68,7 @@ The `r` prefix signals "production-ready."
 
 ---
 
-## Current State (v0.2.0)
+## Current State
 
 **Performance (i5-13400F, Windows 11, warm cache, 20 runs):**
 - C:\Program Files (97k entries): **1,491,712 entries/s** @ t=16
@@ -77,25 +76,20 @@ The `r` prefix signals "production-ready."
 - D:\ (40k entries): **702,785 entries/s** @ t=16
 - C:\ (954k entries): **490,109 entries/s** @ t=12
 
-**Architecture:**
-- parex v0.1.0 published to crates.io ✓
-- `DirectorySource` implements `parex::Source` using `ignore` crate parallel walker
-- `search.rs` gutted — thin wrapper around `parex::search()` with ldx-specific matchers
-- `config.rs` split → `config.rs` + `config_check.rs`
-- `DEFAULT_CONFIG` extracted to `default_config.toml` + `include_str!`
-- `flags.rs` refactored — `parse_args` split into focused helpers
-- `install.sh` generates `config.toml` from `default_config.toml`
-- `dev.sh benchmark` outputs `.md` report, `--live` table, `--csv` raw data
-- Dropped deps: `aho-corasick`, `num_cpus`
+**parex v0.2.1:**
+- `Source` + `Matcher` traits, `SearchBuilder` fluent API
+- `#[non_exhaustive]` errors, `is_recoverable()` / `is_fatal()`
+- `source_err()` / `matcher_err()` convenience constructors
+- `#![forbid(unsafe_code)]`
+- 330 SLoC · 7 integration tests · 7 doc tests
+- Full docs: `README.md`, `DOCS.md`, `CHANGELOG.md`, `CONTRIBUTING.md`
 
-**Features:**
-- Config-driven flag parsing (users can remap any flag)
-- Aliases (e.g., `ct = "-a -A -S -q --verbose"`)
-- Custom flags (e.g., `-R` → auto-expand to `-e rs`)
-- Management flags: `--config`, `--edit`, `--exclude`, `--check`, `--sync`, `--reset`
-- Dynamic `--help` showing user's aliases and custom flags
-- Multi-drive scanning (Windows)
-- Thread scaling with auto-cap at logical cores via `std::thread::available_parallelism`
+**ldx v0.2.0:**
+- `DirectorySource` implements `parex::Source` using `ignore` crate parallel walker
+- Config-driven flag parsing, aliases, custom flags
+- Management flags: `--check`, `--sync`, `--reset`, `--edit`, `--config`
+- `dev.sh` — build, benchmark (`--live`, `--csv`), bump
+- `install.sh` — generates config from `default_config.toml`, preserves aliases on rebuild
 
 ---
 
@@ -118,6 +112,9 @@ Full user control. Want `-a` to mean something else? Change it. The binary is ju
 ### Why Tauri over Electron?
 Smaller binaries, native performance, Rust backend integration.
 
+### Why Svelte for parallax frontend?
+Small bundle, compiles away at build time, close to plain HTML/CSS/JS, great Tauri ecosystem fit.
+
 ### Why NOT Lua-only plugins?
 Accessibility. CSS themes need zero code. Python/JS covers most devs. Rust for power users.
 
@@ -125,75 +122,106 @@ Accessibility. CSS themes need zero code. Python/JS covers most devs. Rust for p
 
 ## Roadmap
 
-### v0.0.7 ✓ Shipped
+### ldx
+
+#### v0.0.7 ✓ Shipped
 - `--check`, `--sync`, `--reset` management commands
 - Dynamic `--help` with user aliases
 - `-L` limit race condition fix
 
-### v0.0.8 ✓ Shipped
+#### v0.0.8 ✓ Shipped
 - README, BENCHMARKS.md, CONTRIBUTING.md updated
 - Scripts moved to `scripts/`, `bump.sh` added
 - Windows flag test pass, clippy clean
 
-### v0.1.0 ✓ Shipped
+#### v0.1.0 ✓ Shipped
 - Full code audit — `flags.rs`, `main.rs`, `search.rs`, `config.rs`, `display.rs`
-- Scripts consolidated: `benchmark.sh`, `build.sh`, `bump.sh` → `dev.sh`
-- `uninstall.sh` absorbed into `install.sh --uninstall`
-- ROADMAP/CHANGELOG split into separate files
+- Scripts consolidated → `dev.sh`
+- ROADMAP/CHANGELOG split
 
-### v0.2.0 ✓ Shipped
-- parex v0.1.0 + v0.2.0 published to crates.io
-- `DirectorySource` + parex integration
+#### v0.2.0 ✓ Shipped
+- parex integration, `DirectorySource`
 - `config.rs` split, `default_config.toml` extracted
-- `flags.rs` refactored into focused helpers
-- `install.sh` generates config from file
-- `dev.sh benchmark` outputs `.md`, `--live`, `--csv`
-- Dropped `aho-corasick`, `num_cpus`
-- Parallax UI mockup complete (aesthetic + advanced modes)
+- `install.sh` alias-safe rebuild
+- `dev.sh benchmark` `.md` output, `--live`, `--csv`
+- Parallax mockup complete
 
-### v0.3.0 — Test Suite (Next)
-- Unit tests for `flags.rs` — alias expansion, custom flag resolution, validation combos
-- Unit tests for `config.rs` — load, `is_flag_available`, path resolution
-- Integration tests — full search round-trips using `DirectorySource`
-- `benches/` with Criterion in parex — baseline throughput measurements
-- parex: `collect_errors` stress test with permission-denied directories
-- `--warn` flag — surface recoverable errors skipped during scan (permission denied, not found)
-- GitHub Actions — automated pre-built binary releases on tag push (no manual release pages)
+#### v0.3.0 — Test Suite (Next)
+- Unit tests: `flags.rs`, `config.rs`
+- Integration tests: full search round-trips via `DirectorySource`
+- `--warn` flag — surface recoverable errors skipped during scan
+- GitHub Actions — automated pre-built binary releases on tag push
 
-### v0.4.0 — parex v0.2.0
-- True parallel matching — engine distributes match work across threads
-- `--stale N` metadata filter — modified > N days ago, cheap pre-filter
+#### v0.4.0
+- Linux benchmark pass (parex-powered numbers)
+- README polish, ldx link in parex docs
+
+#### v0.5.0 — Pre-Parallax Stable
+- Final cleanup, any outstanding minor items
+- → Parallax development begins
+
+---
+
+### parex
+
+#### v0.1.0 ✓ Shipped
+- Initial release, core traits, builder API, error type
+
+#### v0.2.0 ✓ Shipped
+- `#[non_exhaustive]`, `Box<dyn Error>` variants, `NotFound` recoverable
+- `is_fatal()`, `source_err()`, `matcher_err()`
+- Dropped `ignore` dep
+
+#### v0.2.1 ✓ Shipped
+- `DOCS.md`, `CHANGELOG.md`, `CONTRIBUTING.md`
+- README updated — `cargo add parex`, ordering guarantees, `PAREX_DESIGN.md` removed
+
+#### v0.3.0 — Test Suite (Next)
+- Criterion benchmarks in `benches/`
+- `collect_errors` stress test with permission-denied directories
+- Additional edge case tests — limits, thread counts, empty sources
+
+#### v0.4.0
 - Async source support — `AsyncSource` trait for non-blocking IO
-- parex v0.2.0 published to crates.io
+- True parallel matching — engine distributes match work across threads
+- `--stale N` metadata filter groundwork
 
-### parallax — Future
-- Tauri setup, borderless window prototype
-- Real-time search integration with parex
-- Settings panel (threads, scope, theme)
-- Plugin system groundwork (Tier 1: CSS themes)
-- Auto-benchmark on first launch → persist optimal config
-- Progressive plugin tiers (Lua → JS → Python → Rust)
+#### v0.5.0 — Pre-Parallax Stable
+- Workspace setup groundwork (`parex-fs` etc.) if adoption warrants it
+- API review before parallax locks in dependency
+
+---
+
+### parallax (Future — begins after ldx + parex ~0.5.0)
+
+```
+v0.1.0 — Tauri skeleton, borderless window, parex search, CSS themes (Tier 1)
+v0.2.0 — Lua plugins (Tier 2), settings panel, accent colors (~30 shipped)
+v0.3.0 — JS/TS via Deno (Tier 3), custom GUI plugins, Triggers system
+v0.4.0 — Python (Tier 4), Go (v0.4.5)
+v0.5.0 — Rust plugins (Tier 5), permissions system, plugin marketplace groundwork
+```
 
 ---
 
 ## Plugin System Architecture
 
 ### Tier 1 — Themes (CSS/JSON)
-Zero code, just config files. Catppuccin, Nord, Dracula, Tokyo Night, Gruvbox.
+Zero code, just config files. Ships with ~30 accent colors. Catppuccin, Nord, Dracula, Tokyo Night, Gruvbox and more.
 
 ### Tier 2 — Lightweight Scripts (Lua)
-Simple data enrichment, CLI command triggers (`!`, `:`, `>`, `?`). ~200KB runtime.
+Simple data enrichment. ~200KB runtime.
 
 ### Tier 3 — Web Dev Friendly (JS/TS via Deno)
-Familiar to most devs, moderate complexity plugins. Custom GUI allowed — JS devs expect to build UIs.
+Custom GUI allowed. Familiar to most devs.
 
-### Tier 4 — Power Integrations (Python/Go/C# via WASM or native)
-External API calls (Steam, VirusTotal), heavy processing. Custom GUI allowed — e.g. Spotify sidebar, log panel.
+### Tier 4 — Power Integrations (Python, Go)
+Custom GUI allowed. External API calls, heavy processing. Python v0.4.0, Go v0.4.5.
 
 ### Tier 5 — Full System Access (Rust)
-Replace backend parex if desired. Deepest API access. Custom GUI allowed.
+Custom GUI allowed. Replace backend parex if desired. Deepest API access.
 
-**GUI modes:** Each plugin declares which modes it supports:
+**Plugin manifest:**
 ```toml
 [plugin]
 name = "spotify"
@@ -201,9 +229,14 @@ tier = 3
 ui_modes = ["aesthetic", "advanced", "both"]
 custom_gui = true
 ```
-Tiers 1–2 provide CSS/data only — the shell renders them. Tiers 3–5 can own their pane entirely.
 
-**Plugin priorities:** Weighting system so heavy plugins don't block light ones. UI shows "heavy plugin active" badge during execution.
+**Permissions system:** Each plugin declares permissions at install time — network access, clipboard, filesystem, system commands. Tiers 1–2 cannot request network access.
+
+**Official plugins badge:** Official plugins show `by Parallax ✓`. Community plugins show author name only.
+
+**Triggers system:** `!g search` → Google, `> cmd` → run command. POC ships with parallax, community-extensible via plugins.
+
+**Plugin priorities:** Weighting system so heavy plugins don't block light ones. UI shows "heavy plugin active" badge.
 
 ---
 
@@ -214,19 +247,21 @@ Tiers 1–2 provide CSS/data only — the shell renders them. Tiers 3–5 can ow
 - **No website (initially):** GitHub handles docs/downloads for free
 - **No marketing:** Let quality speak
 - **Not trying to beat ripgrep/fd/fzf:** Personal use first
+- **No companion app (for now):** Could be a Tier 4-5 parallax plugin first, standalone app if adoption warrants it
 
 ---
 
 ## Session Notes
 
-**v0.2.0 session (2026-02-21):**
-- parex designed, built, tested, published to crates.io in one day
-- `DirectorySource` using `build_parallel()` + `mpsc::channel` for true parallel streaming
-- Initial `build()` attempt was ~4x slower — caught and fixed before shipping
+**Week 1 (2026-02-14 to 2026-02-21):**
+- ldx pushed to GitHub on day 2
+- parex designed, built, tested, and published to crates.io in one session
+- `DirectorySource` using `build_parallel()` + `mpsc::channel` — initial `build()` was ~4x slower, caught and fixed before shipping
 - Peak: 1,491,712 entries/s on C:\Program Files @ t=16 (warm, 20 runs)
-- Parallax mockup committed to localdex repo — dual mode (aesthetic + advanced)
-- Accessibility-first design: Atkinson Hyperlegible, color accent picker, calm animations
-- `dev.sh benchmark` overhauled — `.md` output by default, `--live` flag for real-time table
+- Parallax mockup complete — dual mode (aesthetic + advanced), Atkinson Hyperlegible, accent color picker
+- parex v0.2.1 — full docs suite shipped, PAREX_DESIGN.md removed
+- Reddit post: 3.1K views, 22 crates.io downloads in first 12 hours
+- One project at a time rule established — avoids context confusion across repos
 
 **End Vision:** A suite of tools so fast, so clean, so configurable that they become daily drivers — not because they beat the competition, but because they're exactly what we need.
 
