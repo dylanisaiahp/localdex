@@ -15,6 +15,7 @@ pub struct ScanResult {
     pub dirs: usize,
     pub duration: Duration,
     pub paths: Vec<PathBuf>,
+    pub errors: Vec<parex::ParexError>,
 }
 
 // ---------------------------------------------------------------------------
@@ -31,6 +32,7 @@ pub struct Config {
     pub limit: Option<usize>,
     pub threads: usize,
     pub collect_paths: bool,
+    pub collect_errors: bool,
     pub exclude: Vec<String>,
 }
 
@@ -122,7 +124,7 @@ pub fn scan_dir(dir: &PathBuf, config: &Config) -> ScanResult {
         .source(source)
         .threads(config.threads)
         .collect_paths(config.collect_paths)
-        .collect_errors(false);
+        .collect_errors(config.collect_errors);
 
     if let Some(lim) = config.limit {
         builder = builder.limit(lim);
@@ -175,5 +177,6 @@ pub fn scan_dir(dir: &PathBuf, config: &Config) -> ScanResult {
         dirs: result.stats.dirs,
         duration: result.stats.duration,
         paths: result.paths,
+        errors: result.errors,
     }
 }

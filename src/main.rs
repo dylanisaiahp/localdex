@@ -12,6 +12,7 @@ use std::path::PathBuf;
 use std::time::Instant;
 
 use config::{check_config, config_path, load_config, reset_config, sync_config};
+use colored::Colorize;
 use display::{fmt_num, print_help, print_result, print_stats};
 use flags::{ParsedFlags, parse_args};
 use launcher::{open_file, prompt_and_open};
@@ -35,6 +36,7 @@ fn build_search_config(f: &ParsedFlags, collect_paths: bool) -> Config {
         limit: f.limit,
         threads: f.threads,
         collect_paths,
+        collect_errors: f.warn,
         exclude: f.exclude.clone(),
     }
 }
@@ -79,6 +81,22 @@ fn resolve_dir(dir: PathBuf) -> PathBuf {
     };
 
     dir
+}
+
+// ---------------------------------------------------------------------------
+// Print warnings from recoverable errors
+// ---------------------------------------------------------------------------
+
+fn print_warnings(result: &ScanResult, f: &ParsedFlags) {
+    if !f.warn || result.errors.is_empty() {
+        return;
+    }
+    eprintln!("⚠ {} path{} skipped:", result.errors.len(), if result.errors.len() == 1 { "" } else { "s" });
+    for err in &result.errors {
+        if let Some(path) = err.path() {
+            eprintln!("  {} {}", "skipped:".yellow(), path.display());
+        }
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -148,12 +166,14 @@ fn main() -> Result<()> {
             println!("Searching in: {}", dir.display());
         }
 
-        let config = build_search_config(&f, f.open || f.where_mode);
+        let collect_paths = !f.quiet && !f.all || f.open || f.where_mode;
+        let config = build_search_config(&f, collect_paths);
         let result = scan_dir(&dir, &config);
         let reported_matches = clamp_matches(&result, f.limit);
 
         print_result(&result, reported_matches, &f, "");
         print_stats(&result, &f, "");
+        print_warnings(&result, &f);
 
         if reported_matches == 0 {
             std::process::exit(1);

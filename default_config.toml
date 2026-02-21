@@ -118,6 +118,14 @@ os = "all"
 action = "set_boolean"
 target = "where_mode"
 
+[flags.warn]
+short = "W"
+long = "warn"
+description = "Show paths skipped due to permission errors"
+os = "all"
+action = "set_boolean"
+target = "warn"
+
 [aliases]
 
 [custom]

@@ -31,6 +31,7 @@ pub struct ParsedFlags {
     pub check_config: bool,
     pub sync_config: bool,
     pub reset_config: bool,
+    pub warn: bool,
 }
 
 // ---------------------------------------------------------------------------
@@ -263,6 +264,7 @@ struct BoolFlags {
     where_mode: bool,
     case_sensitive: bool,
     all_drives: bool,
+    warn: bool,
 }
 
 fn parse_bool_flags(raw: &[String], config: &LdxConfig) -> BoolFlags {
@@ -296,6 +298,7 @@ fn parse_bool_flags(raw: &[String], config: &LdxConfig) -> BoolFlags {
         where_mode: raw.iter().any(|a| flag_matches(a, &where_s, &where_l)),
         case_sensitive: raw.iter().any(|a| flag_matches(a, &cs_s, &cs_l)),
         all_drives,
+        warn: raw.iter().any(|a| a == "--warn"),
     }
 }
 
@@ -337,6 +340,7 @@ fn parse_pattern(raw: &[String], config: &LdxConfig) -> Result<Option<String>> {
                 "--sync",
                 "--reset",
                 "--exclude",
+                "--warn",
             ]
             .iter()
             .map(|s| s.to_string()),
@@ -463,5 +467,6 @@ pub fn parse_args(config: &LdxConfig) -> Result<ParsedFlags> {
         check_config: false,
         sync_config: false,
         reset_config: false,
+        warn: b.warn,
     })
 }
