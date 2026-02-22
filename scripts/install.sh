@@ -33,7 +33,11 @@ get_installed_version() {
 
 get_latest_version() {
     if command -v curl > /dev/null 2>&1; then
-        curl -s "$REPO_API" 2>/dev/null | grep '"name"' | head -1 | grep -oE 'v[0-9]+\.[0-9]+\.[0-9]+' | head -1
+        curl -s "$REPO_API" 2>/dev/null \
+            | grep '"name"' \
+            | grep -oE 'v[0-9]+\.[0-9]+\.[0-9]+' \
+            | sort -t. -k1,1V -k2,2n -k3,3n \
+            | tail -1
     else
         echo ""
     fi
