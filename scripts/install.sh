@@ -8,6 +8,9 @@
 
 set -e
 
+# Ensure interactive prompts work even when script is piped (e.g. curl | bash)
+[ -t 0 ] || exec </dev/tty
+
 # ─── Colors ───────────────────────────────────────────────────────────────────
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -132,7 +135,7 @@ do_uninstall() {
         echo -e "  ${CYAN}2)${RESET} Uninstall everything (binaries, config, and source)"
         echo -e "  ${CYAN}3)${RESET} Exit"
         echo ""
-        if [ ! -t 0 ]; then CHOICE=; else read -rp "Choice [1-3] (default: 1): " CHOICE; fi
+        read -rp "Choice [1-3] (default: 1): " CHOICE
         CHOICE=${CHOICE:-1}
         case "$CHOICE" in
             1) REMOVE_SOURCE=false ;;
@@ -144,7 +147,7 @@ do_uninstall() {
         echo -e "  ${CYAN}1)${RESET} Uninstall ldx"
         echo -e "  ${CYAN}2)${RESET} Exit"
         echo ""
-        if [ ! -t 0 ]; then CHOICE=; else read -rp "Choice [1-2] (default: 1): " CHOICE; fi
+        read -rp "Choice [1-2] (default: 1): " CHOICE
         CHOICE=${CHOICE:-1}
         REMOVE_SOURCE=false
         case "$CHOICE" in
@@ -262,7 +265,7 @@ pick_destination() {
     fi
 
     echo ""
-    if [ ! -t 0 ]; then CHOICE=; else read -rp "Choice [1-4] (default: 1): " CHOICE; fi
+    read -rp "Choice [1-4] (default: 1): " CHOICE
     CHOICE=${CHOICE:-1}
 
     case "$CHOICE" in
@@ -392,7 +395,7 @@ install_from_source() {
 
         echo ""
         echo -e "${YELLOW}Keep source code for future updates/modifications?${RESET}"
-        if [ ! -t 0 ]; then KEEP_SRC=N; else read -rp "Keep source? [Y/n]: " KEEP_SRC; fi
+        read -rp "Keep source? [Y/n]: " KEEP_SRC
         KEEP_SRC=${KEEP_SRC:-Y}
 
         if [[ "$KEEP_SRC" =~ ^[Yy]$ ]]; then
@@ -432,7 +435,7 @@ if [ -n "$INSTALLED_VERSION" ] && [ "$FORCE" = false ]; then
         echo -e "  ${CYAN}2)${RESET} Reinstall current version"
         echo -e "  ${CYAN}3)${RESET} Exit"
         echo ""
-        if [ ! -t 0 ]; then UPDATE_CHOICE=; else read -rp "Choice [1-3] (default: 1): " UPDATE_CHOICE; fi
+        read -rp "Choice [1-3] (default: 1): " UPDATE_CHOICE
         UPDATE_CHOICE=${UPDATE_CHOICE:-1}
         case "$UPDATE_CHOICE" in
             1|2) ;;
@@ -449,7 +452,7 @@ if [ -n "$INSTALLED_VERSION" ] && [ "$FORCE" = false ]; then
         echo -e "  ${CYAN}1)${RESET} Reinstall"
         echo -e "  ${CYAN}2)${RESET} Exit"
         echo ""
-        if [ ! -t 0 ]; then REINSTALL_CHOICE=; else read -rp "Choice [1-2] (default: 2): " REINSTALL_CHOICE; fi
+        read -rp "Choice [1-2] (default: 2): " REINSTALL_CHOICE
         REINSTALL_CHOICE=${REINSTALL_CHOICE:-2}
         case "$REINSTALL_CHOICE" in
             1) ;;
