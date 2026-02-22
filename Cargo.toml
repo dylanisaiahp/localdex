@@ -1,6 +1,6 @@
 [package]
 name = "localdex"
-version = "0.3.2"
+version = "0.3.3"
 edition = "2024"
 
 [dependencies]
@@ -11,3 +11,4 @@ dirs = "6.0.0"
 parex = "0.2.0"
 serde = { version = "1.0.228", features = ["derive"] }
 toml = "1.0.1"
+chrono = "0.4.43"

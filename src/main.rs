@@ -1,3 +1,6 @@
+mod bench;
+mod bench_output;
+mod bench_runner;
 mod config;
 mod config_check;
 mod display;
@@ -94,14 +97,10 @@ fn print_warnings(result: &ScanResult, f: &ParsedFlags) {
     if !f.warn || result.errors.is_empty() {
         return;
     }
+    eprintln!("⚠ {} path{} skipped:", result.errors.len(), if result.errors.len() == 1 { "" } else { "s" });
     for err in &result.errors {
         if let Some(path) = err.path() {
-            let reason = if err.is_recoverable() {
-                "Permission denied"
-            } else {
-                "Inaccessible"
-            };
-            eprintln!("  {} {} — {}", "⚠".yellow(), path.display(), reason.dimmed());
+            eprintln!("  {} {}", "skipped:".yellow(), path.display());
         }
     }
 }
@@ -112,6 +111,13 @@ fn print_warnings(result: &ScanResult, f: &ParsedFlags) {
 
 fn main() -> Result<()> {
     let ldx_config = load_config()?;
+
+    // ── Subcommand: bench ─────────────────────────────────────────────────────
+    let raw: Vec<String> = std::env::args().skip(1).collect();
+    if raw.first().map(|s| s.as_str()) == Some("bench") {
+        return bench::run(&raw[1..], &ldx_config);
+    }
+
     let f = parse_args(&ldx_config)?;
 
     // ── Management flags ──────────────────────────────────────────────────────
