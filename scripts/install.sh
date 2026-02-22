@@ -8,9 +8,6 @@
 
 set -e
 
-# Ensure interactive prompts work even when script is piped (e.g. curl | bash)
-[ -t 0 ] || exec </dev/tty
-
 # ─── Colors ───────────────────────────────────────────────────────────────────
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -135,7 +132,7 @@ do_uninstall() {
         echo -e "  ${CYAN}2)${RESET} Uninstall everything (binaries, config, and source)"
         echo -e "  ${CYAN}3)${RESET} Exit"
         echo ""
-        read -rp "Choice [1-3] (default: 1): " CHOICE
+        read -rp "Choice [1-3] (default: 1): " CHOICE </dev/tty
         CHOICE=${CHOICE:-1}
         case "$CHOICE" in
             1) REMOVE_SOURCE=false ;;
@@ -147,7 +144,7 @@ do_uninstall() {
         echo -e "  ${CYAN}1)${RESET} Uninstall ldx"
         echo -e "  ${CYAN}2)${RESET} Exit"
         echo ""
-        read -rp "Choice [1-2] (default: 1): " CHOICE
+        read -rp "Choice [1-2] (default: 1): " CHOICE </dev/tty
         CHOICE=${CHOICE:-1}
         REMOVE_SOURCE=false
         case "$CHOICE" in
@@ -183,7 +180,7 @@ do_uninstall() {
 
     echo ""
     echo -e "${YELLOW}Remove PATH entries added by install.sh? [y/N]:${RESET} "
-    read -rp "" REMOVE_PATH
+    read -rp "" REMOVE_PATH </dev/tty
     if [[ "$REMOVE_PATH" =~ ^[Yy]$ ]]; then
         if [ "$OS" = "windows" ]; then
             SHELL_CONFIG="$HOME/.bashrc"
@@ -265,14 +262,14 @@ pick_destination() {
     fi
 
     echo ""
-    read -rp "Choice [1-4] (default: 1): " CHOICE
+    read -rp "Choice [1-4] (default: 1): " CHOICE </dev/tty
     CHOICE=${CHOICE:-1}
 
     case "$CHOICE" in
         1) DEST="$CARGO_BIN"; SKIP_PATH=true ;;
         2) DEST="$USER_BIN";  SKIP_PATH=false ;;
         3) DEST="$SYSTEM_BIN"; SKIP_PATH=false ;;
-        4) read -rp "Enter custom path: " DEST; SKIP_PATH=false ;;
+        4) read -rp "Enter custom path: " DEST </dev/tty; SKIP_PATH=false ;;
         *) echo -e "${RED}Invalid choice. Exiting.${RESET}"; exit 1 ;;
     esac
 }
@@ -290,7 +287,7 @@ setup_path() {
 
     echo ""
     echo -e "${YELLOW}$DEST is not in your PATH.${RESET}"
-    read -rp "Add it now? [y/N]: " ADD_PATH
+    read -rp "Add it now? [y/N]: " ADD_PATH </dev/tty
     if [[ "$ADD_PATH" =~ ^[Yy]$ ]]; then
         if [ "$OS" = "windows" ]; then
             SHELL_CONFIG="$HOME/.bashrc"
@@ -395,7 +392,7 @@ install_from_source() {
 
         echo ""
         echo -e "${YELLOW}Keep source code for future updates/modifications?${RESET}"
-        read -rp "Keep source? [Y/n]: " KEEP_SRC
+        read -rp "Keep source? [Y/n]: " KEEP_SRC </dev/tty
         KEEP_SRC=${KEEP_SRC:-Y}
 
         if [[ "$KEEP_SRC" =~ ^[Yy]$ ]]; then
@@ -435,7 +432,7 @@ if [ -n "$INSTALLED_VERSION" ] && [ "$FORCE" = false ]; then
         echo -e "  ${CYAN}2)${RESET} Reinstall current version"
         echo -e "  ${CYAN}3)${RESET} Exit"
         echo ""
-        read -rp "Choice [1-3] (default: 1): " UPDATE_CHOICE
+        read -rp "Choice [1-3] (default: 1): " UPDATE_CHOICE </dev/tty
         UPDATE_CHOICE=${UPDATE_CHOICE:-1}
         case "$UPDATE_CHOICE" in
             1|2) ;;
@@ -452,7 +449,7 @@ if [ -n "$INSTALLED_VERSION" ] && [ "$FORCE" = false ]; then
         echo -e "  ${CYAN}1)${RESET} Reinstall"
         echo -e "  ${CYAN}2)${RESET} Exit"
         echo ""
-        read -rp "Choice [1-2] (default: 2): " REINSTALL_CHOICE
+        read -rp "Choice [1-2] (default: 2): " REINSTALL_CHOICE </dev/tty
         REINSTALL_CHOICE=${REINSTALL_CHOICE:-2}
         case "$REINSTALL_CHOICE" in
             1) ;;
