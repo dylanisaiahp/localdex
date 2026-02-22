@@ -298,7 +298,7 @@ fn parse_bool_flags(raw: &[String], config: &LdxConfig) -> BoolFlags {
         where_mode: raw.iter().any(|a| flag_matches(a, &where_s, &where_l)),
         case_sensitive: raw.iter().any(|a| flag_matches(a, &cs_s, &cs_l)),
         all_drives,
-        warn: raw.iter().any(|a| a == "--warn"),
+        warn: raw.iter().any(|a| a == "--warn" || a == "-W"),
     }
 }
 

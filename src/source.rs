@@ -61,69 +61,72 @@ impl Source for DirectorySource {
 
         let exclude = self.exclude.clone();
         let dirs_only = self.dirs_only;
-        let walker = builder.build_parallel();
 
-        // Channel to stream entries from the parallel walker to the iterator
+        // Channel to send entries and errors
         let (tx, rx) = mpsc::channel::<Result<Entry, ParexError>>();
 
         std::thread::spawn(move || {
-            walker.run(|| {
+            builder.build_parallel().run(|| {
                 let tx = tx.clone();
                 let exclude = exclude.clone();
-
                 Box::new(move |res| {
                     use ignore::WalkState;
 
-                    let entry = match res {
-                        Err(e) => {
-                            let _ = tx.send(Err(map_ignore_error(e)));
-                            return WalkState::Continue;
-                        }
-                        Ok(e) => e,
-                    };
+                    // Always send errors immediately
+                    if let Err(err) = res {
+                        let _ = tx.send(Err(map_ignore_error(err)));
+                        return WalkState::Continue;
+                    }
 
-                    // Skip root itself
+                    let entry = res.unwrap();
+
+                    // Skip root entry itself
                     if entry.depth() == 0 {
                         return WalkState::Continue;
                     }
 
-                    let ft = match entry.file_type() {
-                        Some(ft) => ft,
-                        None => return WalkState::Continue,
-                    };
+                    // Safely extract FileType
+                    let file_type = entry.file_type();
+                    let is_dir = file_type.map(|ft| ft.is_dir()).unwrap_or(false);
+                    let is_file = file_type.map(|ft| ft.is_file()).unwrap_or(false);
+                    let is_symlink = file_type.map(|ft| ft.is_symlink()).unwrap_or(false);
 
-                    // Skip excluded directories
-                    if ft.is_dir() {
-                        let name = entry.file_name().to_string_lossy();
-                        if exclude.iter().any(|ex| name.as_ref() == ex.as_str()) {
-                            return WalkState::Skip;
-                        }
-                        // Probe directory readability — ignore swallows permission
-                        // errors before our closure sees them, so we check manually
-                        if let Err(e) = std::fs::read_dir(entry.path())
-                            && e.kind() == std::io::ErrorKind::PermissionDenied
-                        {
-                            let _ = tx.send(Err(ParexError::PermissionDenied(
-                                entry.path().to_path_buf(),
-                            )));
-                        }
-                    }
-
-                    // In dirs_only mode, skip files entirely
-                    if dirs_only && ft.is_file() {
+                    // Forward unreadable directories as errors
+                    if is_dir && let Err(e) = std::fs::read_dir(entry.path()) {
+                        let pe = if e.kind() == std::io::ErrorKind::PermissionDenied {
+                            ParexError::PermissionDenied(entry.path().to_path_buf())
+                        } else {
+                            ParexError::Io {
+                                path: entry.path().to_path_buf(),
+                                source: e,
+                            }
+                        };
+                        let _ = tx.send(Err(pe));
                         return WalkState::Continue;
                     }
 
-                    let kind = if ft.is_dir() {
+                    // Skip excluded directories
+                    if is_dir && exclude.contains(&entry.file_name().to_string_lossy().to_string())
+                    {
+                        return WalkState::Skip;
+                    }
+
+                    // dirs_only mode
+                    if dirs_only && is_file {
+                        return WalkState::Continue;
+                    }
+
+                    // Build EntryKind
+                    let kind = if is_dir {
                         EntryKind::Dir
-                    } else if ft.is_symlink() {
+                    } else if is_symlink {
                         EntryKind::Symlink
                     } else {
                         EntryKind::File
                     };
 
                     let e = Entry {
-                        name: entry.file_name().to_string_lossy().into_owned(),
+                        name: entry.file_name().to_string_lossy().to_string(),
                         path: entry.path().to_path_buf(),
                         kind,
                         depth: entry.depth(),
@@ -134,7 +137,6 @@ impl Source for DirectorySource {
                     WalkState::Continue
                 })
             });
-            // tx dropped here — rx iterator ends naturally
         });
 
         Box::new(rx.into_iter())

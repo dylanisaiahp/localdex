@@ -94,10 +94,14 @@ fn print_warnings(result: &ScanResult, f: &ParsedFlags) {
     if !f.warn || result.errors.is_empty() {
         return;
     }
-    eprintln!("⚠ {} path{} skipped:", result.errors.len(), if result.errors.len() == 1 { "" } else { "s" });
     for err in &result.errors {
         if let Some(path) = err.path() {
-            eprintln!("  {} {}", "skipped:".yellow(), path.display());
+            let reason = if err.is_recoverable() {
+                "Permission denied"
+            } else {
+                "Inaccessible"
+            };
+            eprintln!("  {} {} — {}", "⚠".yellow(), path.display(), reason.dimmed());
         }
     }
 }

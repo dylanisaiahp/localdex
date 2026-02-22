@@ -132,7 +132,7 @@ do_uninstall() {
         echo -e "  ${CYAN}2)${RESET} Uninstall everything (binaries, config, and source)"
         echo -e "  ${CYAN}3)${RESET} Exit"
         echo ""
-        read -rp "Choice [1-3] (default: 1): " CHOICE
+        if [ ! -t 0 ]; then CHOICE=; else read -rp "Choice [1-3] (default: 1): " CHOICE; fi
         CHOICE=${CHOICE:-1}
         case "$CHOICE" in
             1) REMOVE_SOURCE=false ;;
@@ -144,7 +144,7 @@ do_uninstall() {
         echo -e "  ${CYAN}1)${RESET} Uninstall ldx"
         echo -e "  ${CYAN}2)${RESET} Exit"
         echo ""
-        read -rp "Choice [1-2] (default: 1): " CHOICE
+        if [ ! -t 0 ]; then CHOICE=; else read -rp "Choice [1-2] (default: 1): " CHOICE; fi
         CHOICE=${CHOICE:-1}
         REMOVE_SOURCE=false
         case "$CHOICE" in
@@ -262,7 +262,7 @@ pick_destination() {
     fi
 
     echo ""
-    read -rp "Choice [1-4] (default: 1): " CHOICE
+    if [ ! -t 0 ]; then CHOICE=; else read -rp "Choice [1-4] (default: 1): " CHOICE; fi
     CHOICE=${CHOICE:-1}
 
     case "$CHOICE" in
@@ -392,7 +392,7 @@ install_from_source() {
 
         echo ""
         echo -e "${YELLOW}Keep source code for future updates/modifications?${RESET}"
-        read -rp "Keep source? [Y/n]: " KEEP_SRC
+        if [ ! -t 0 ]; then KEEP_SRC=N; else read -rp "Keep source? [Y/n]: " KEEP_SRC; fi
         KEEP_SRC=${KEEP_SRC:-Y}
 
         if [[ "$KEEP_SRC" =~ ^[Yy]$ ]]; then
@@ -432,7 +432,7 @@ if [ -n "$INSTALLED_VERSION" ] && [ "$FORCE" = false ]; then
         echo -e "  ${CYAN}2)${RESET} Reinstall current version"
         echo -e "  ${CYAN}3)${RESET} Exit"
         echo ""
-        read -rp "Choice [1-3] (default: 1): " UPDATE_CHOICE
+        if [ ! -t 0 ]; then UPDATE_CHOICE=; else read -rp "Choice [1-3] (default: 1): " UPDATE_CHOICE; fi
         UPDATE_CHOICE=${UPDATE_CHOICE:-1}
         case "$UPDATE_CHOICE" in
             1|2) ;;
@@ -449,7 +449,7 @@ if [ -n "$INSTALLED_VERSION" ] && [ "$FORCE" = false ]; then
         echo -e "  ${CYAN}1)${RESET} Reinstall"
         echo -e "  ${CYAN}2)${RESET} Exit"
         echo ""
-        read -rp "Choice [1-2] (default: 2): " REINSTALL_CHOICE
+        if [ ! -t 0 ]; then REINSTALL_CHOICE=; else read -rp "Choice [1-2] (default: 2): " REINSTALL_CHOICE; fi
         REINSTALL_CHOICE=${REINSTALL_CHOICE:-2}
         case "$REINSTALL_CHOICE" in
             1) ;;
