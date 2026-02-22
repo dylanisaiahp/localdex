@@ -84,13 +84,16 @@ pub fn parse_bench_args(raw: &[String], config: &LdxConfig) -> Result<BenchArgs>
         i += 1;
     }
 
-    // Default dirs if none specified
-    if dirs.is_empty()
-        && let Some(home) = home_dir() {
-            dirs.push(home);
-        }
+    // Always include defaults, --dirs appends to them
+    let mut default_dirs = Vec::new();
+    if let Some(home) = home_dir() {
+        default_dirs.push(home);
+    }
+    default_dirs.push(PathBuf::from("/usr"));
+    default_dirs.push(PathBuf::from("/"));
+    default_dirs.extend(dirs);
 
-    Ok(BenchArgs { threads, runs, dirs, out, live, csv, edit })
+    Ok(BenchArgs { threads, runs, dirs: default_dirs, out, live, csv, edit })
 }
 
 // ---------------------------------------------------------------------------

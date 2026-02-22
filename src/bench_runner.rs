@@ -52,70 +52,6 @@ fn which(cmd: &str) -> bool {
 }
 
 // ---------------------------------------------------------------------------
-// Run ldx scan and return entries/s
-// ---------------------------------------------------------------------------
-
-fn run_ldx_once(dir: &PathBuf, threads: usize) -> Option<(f64, usize)> {
-    let config = SearchConfig {
-        case_sensitive: false,
-        quiet:          true,
-        all:            true,
-        dirs_only:      false,
-        extension:      None,
-        pattern:        None,
-        limit:          None,
-        threads,
-        collect_paths:  false,
-        collect_errors: false,
-        exclude:        vec![],
-    };
-
-    let result = scan_dir(dir, &config);
-    let entries = result.files + result.dirs;
-    let secs = result.duration.as_secs_f64();
-
-    if secs > 0.0 && entries > 0 {
-        Some((entries as f64 / secs, entries))
-    } else {
-        None
-    }
-}
-
-// ---------------------------------------------------------------------------
-// Run a competitor tool and return entries/s using wall time
-// ---------------------------------------------------------------------------
-
-fn run_competitor_once(tool: &str, dir: &PathBuf) -> Option<f64> {
-    let start = Instant::now();
-
-    let status = match tool {
-        "fd" => std::process::Command::new("fd")
-            .args(["--no-ignore", "--hidden", "."])
-            .arg(dir)
-            .stdout(std::process::Stdio::null())
-            .stderr(std::process::Stdio::null())
-            .status(),
-        "rg" => std::process::Command::new("rg")
-            .args(["--files", "--no-ignore", "--hidden"])
-            .arg(dir)
-            .stdout(std::process::Stdio::null())
-            .stderr(std::process::Stdio::null())
-            .status(),
-        _ => return None,
-    };
-
-    let elapsed = start.elapsed().as_secs_f64();
-
-    if status.map(|s| s.success()).unwrap_or(false) && elapsed > 0.0 {
-        // We don't know exact entry count for competitors so we use a rough
-        // estimate — just track raw time and report as relative
-        Some(elapsed)
-    } else {
-        None
-    }
-}
-
-// ---------------------------------------------------------------------------
 // Stats helpers
 // ---------------------------------------------------------------------------
 
@@ -133,8 +69,147 @@ fn calc_stats(mut samples: Vec<f64>) -> (f64, f64, f64, f64) {
     (avg, median, min, max)
 }
 
+fn progress(live: bool, msg: &str) {
+    if !live {
+        print!("\r  {:<78}", msg);
+        let _ = std::io::Write::flush(&mut std::io::stdout());
+    }
+}
+
+fn clear_progress(live: bool) {
+    if !live {
+        print!("\r{:<80}\r", "");
+        let _ = std::io::Write::flush(&mut std::io::stdout());
+    }
+}
+
 // ---------------------------------------------------------------------------
-// run_benchmark
+// Run ldx — uses internal scan_dir directly
+// ---------------------------------------------------------------------------
+
+fn bench_ldx(dir: &PathBuf, config: &BenchConfig) -> Option<BenchResult> {
+    let search_config = SearchConfig {
+        case_sensitive: false,
+        quiet:          true,
+        all:            true,
+        dirs_only:      false,
+        extension:      None,
+        pattern:        None,
+        limit:          None,
+        threads:        config.threads,
+        collect_paths:  false,
+        collect_errors: false,
+        exclude:        vec![],
+    };
+
+    let mut speeds  = Vec::new();
+    let mut entries = 0usize;
+
+    for i in 0..config.runs {
+        progress(config.live, &format!("ldx  {} [{}/{}]", dir.display(), i + 1, config.runs));
+
+        let result = scan_dir(dir, &search_config);
+        let e = result.files + result.dirs;
+        let secs = result.duration.as_secs_f64();
+
+        if secs > 0.0 && e > 0 {
+            let speed = e as f64 / secs;
+            speeds.push(speed);
+            entries = e;
+            if config.live {
+                println!("    ldx  run {:>2}  {} entries/s", i + 1, fmt_speed(speed));
+            }
+        }
+    }
+
+    clear_progress(config.live);
+
+    if speeds.is_empty() { return None; }
+
+    let (avg, median, min, max) = calc_stats(speeds);
+    if config.live {
+        println!("    ldx  avg {} | med {} | min {} | max {} entries/s",
+            fmt_speed(avg), fmt_speed(median), fmt_speed(min), fmt_speed(max));
+    }
+
+    Some(BenchResult { tool: "ldx".to_string(), dir: dir.clone(), avg, median, min, max, runs: config.runs, entries })
+}
+
+// ---------------------------------------------------------------------------
+// Run a competitor — captures output to count real entries
+// ---------------------------------------------------------------------------
+
+fn bench_competitor(tool: &str, dir: &PathBuf, config: &BenchConfig) -> Option<BenchResult> {
+    let mut speeds  = Vec::new();
+    let mut entries = 0usize;
+
+    for i in 0..config.runs {
+        progress(config.live, &format!("{}  {} [{}/{}]", tool, dir.display(), i + 1, config.runs));
+
+        let start = Instant::now();
+
+        let output = match tool {
+            "fd" => std::process::Command::new("fd")
+                .args(["--no-ignore", "--hidden", "."])
+                .arg(dir)
+                .stderr(std::process::Stdio::null())
+                .output(),
+            "rg" => std::process::Command::new("rg")
+                .args(["--files", "--no-ignore", "--hidden"])
+                .arg(dir)
+                .stderr(std::process::Stdio::null())
+                .output(),
+            _ => return None,
+        };
+
+        let elapsed = start.elapsed().as_secs_f64();
+
+        if let Ok(out) = output {
+            let e = out.stdout.split(|&b| b == b'\n')
+                .filter(|l| !l.is_empty())
+                .count();
+
+            if elapsed > 0.0 && e > 0 {
+                let speed = e as f64 / elapsed;
+                speeds.push(speed);
+                entries = e;
+                if config.live {
+                    println!("    {}  run {:>2}  {} entries/s  ({} entries)", tool, i + 1, fmt_speed(speed), e);
+                }
+            }
+        }
+    }
+
+    clear_progress(config.live);
+
+    if speeds.is_empty() { return None; }
+
+    let (avg, median, min, max) = calc_stats(speeds);
+    if config.live {
+        println!("    {}  avg {} | med {} | min {} | max {} entries/s",
+            tool, fmt_speed(avg), fmt_speed(median), fmt_speed(min), fmt_speed(max));
+    }
+
+    Some(BenchResult { tool: tool.to_string(), dir: dir.clone(), avg, median, min, max, runs: config.runs, entries })
+}
+
+// ---------------------------------------------------------------------------
+// Format entries/s with commas
+// ---------------------------------------------------------------------------
+
+fn fmt_speed(n: f64) -> String {
+    let n = n as u64;
+    let s = n.to_string();
+    let mut result = String::new();
+    for (i, c) in s.chars().rev().enumerate() {
+        if i > 0 && i % 3 == 0 { result.push(','); }
+        result.push(c);
+    }
+    result.chars().rev().collect()
+}
+
+// ---------------------------------------------------------------------------
+// run_benchmark — sequential: all ldx runs, then all fd runs, then all rg runs
 // ---------------------------------------------------------------------------
 
 pub fn run_benchmark(config: &BenchConfig) -> Result<Vec<BenchResult>> {
@@ -151,82 +226,15 @@ pub fn run_benchmark(config: &BenchConfig) -> Result<Vec<BenchResult>> {
             println!("  📂 {}", dir.display());
         }
 
-        // ── ldx ──────────────────────────────────────────────────────────────
-        let mut speeds: Vec<f64> = Vec::new();
-        let mut last_entries = 0usize;
-
-        for i in 0..config.runs {
-            if !config.live {
-                print!("\r  ldx  {}  [{}/{}]", dir.display(), i + 1, config.runs);
-                let _ = std::io::Write::flush(&mut std::io::stdout());
-            }
-
-            if let Some((speed, entries)) = run_ldx_once(dir, config.threads) {
-                speeds.push(speed);
-                last_entries = entries;
-
-                if config.live {
-                    println!("    ldx  run {:>2}  {:.0} entries/s", i + 1, speed);
-                }
-            }
+        // ldx first
+        if let Some(r) = bench_ldx(dir, config) {
+            results.push(r);
         }
 
-        if !config.live {
-            print!("\r{:<80}\r", ""); // clear line
-        }
-
-        if !speeds.is_empty() {
-            let (avg, median, min, max) = calc_stats(speeds);
-            if config.live {
-                println!("    ldx  avg {:.0} | med {:.0} | min {:.0} | max {:.0} entries/s", avg, median, min, max);
-            }
-            results.push(BenchResult {
-                tool: "ldx".to_string(),
-                dir: dir.clone(),
-                avg, median, min, max,
-                runs: config.runs,
-                entries: last_entries,
-            });
-        }
-
-        // ── Competitors ───────────────────────────────────────────────────────
+        // then each competitor sequentially
         for tool in &competitors {
-            let mut times: Vec<f64> = Vec::new();
-
-            for i in 0..config.runs {
-                if !config.live {
-                    print!("\r  {}  {}  [{}/{}]", tool, dir.display(), i + 1, config.runs);
-                    let _ = std::io::Write::flush(&mut std::io::stdout());
-                }
-
-                if let Some(elapsed) = run_competitor_once(tool, dir) {
-                    times.push(elapsed);
-
-                    if config.live {
-                        println!("    {}  run {:>2}  {:.3}s", tool, i + 1, elapsed);
-                    }
-                }
-            }
-
-            if !config.live {
-                print!("\r{:<80}\r", "");
-            }
-
-            if !times.is_empty() {
-                // Convert elapsed seconds → entries/s using ldx's entry count as reference
-                let entries = last_entries as f64;
-                let speeds: Vec<f64> = times.iter().map(|t| if *t > 0.0 { entries / t } else { 0.0 }).collect();
-                let (avg, median, min, max) = calc_stats(speeds);
-                if config.live {
-                    println!("    {}  avg {:.0} | med {:.0} | min {:.0} | max {:.0} entries/s", tool, avg, median, min, max);
-                }
-                results.push(BenchResult {
-                    tool: tool.clone(),
-                    dir: dir.clone(),
-                    avg, median, min, max,
-                    runs: config.runs,
-                    entries: last_entries,
-                });
+            if let Some(r) = bench_competitor(tool, dir, config) {
+                results.push(r);
             }
         }
 
