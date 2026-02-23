@@ -11,7 +11,7 @@
 
 *Find any file on your system in milliseconds — config-driven, alias-powered, cross-platform.*
 
-**Linux: ~4.3M entries/s on / (Ryzen 9 7950X, t=16)**
+**Linux: ~4.3M entries/s on / (i5-13400F, t=16)**
 
 </div>
 
