@@ -15,7 +15,7 @@ REPO_API="https://api.github.com/repos/dylanisaiahp/localdex/tags"
 RELEASES_API="https://api.github.com/repos/dylanisaiahp/localdex/releases/latest"
 BINARY_NAME="localdex"
 ALIAS_NAME="ldx"
-INSTALL_DIR="$HOME/.cargo/bin"
+INSTALL_DIR="$HOME/.local/bin"
 
 # ─── Helpers ──────────────────────────────────────────────────────────────────
 print_header() {
@@ -101,6 +101,37 @@ install_config() {
     fi
 }
 
+# ─── PATH setup ───────────────────────────────────────────────────────────────
+setup_path() {
+    # Already in PATH — nothing to do
+    case ":$PATH:" in
+        *":$INSTALL_DIR:"*) return 0 ;;
+    esac
+
+    # Detect shell rc file
+    SHELL_NAME="$(basename "$SHELL")"
+    case "$SHELL_NAME" in
+        zsh)  RC_FILE="$HOME/.zshrc" ;;
+        bash) RC_FILE="$HOME/.bashrc" ;;
+        fish) RC_FILE="$HOME/.config/fish/config.fish" ; FISH=true ;;
+        *)    RC_FILE="$HOME/.profile" ;;
+    esac
+
+    # Don't add if already present in rc file
+    if grep -q "$INSTALL_DIR" "$RC_FILE" 2>/dev/null; then
+        return 0
+    fi
+
+    echo "" >> "$RC_FILE"
+    if [ "$FISH" = "true" ]; then
+        echo "fish_add_path $INSTALL_DIR" >> "$RC_FILE"
+    else
+        echo "export PATH=\"$INSTALL_DIR:\$PATH\"" >> "$RC_FILE"
+    fi
+    printf "${GREEN}✓ Added $INSTALL_DIR to PATH in $RC_FILE${RESET}\n"
+    printf "${YELLOW}  Restart your shell or run: source $RC_FILE${RESET}\n"
+}
+
 # ─── Binary download (fast path) ──────────────────────────────────────────────
 try_download_binary() {
     detect_platform
@@ -139,6 +170,7 @@ try_download_binary() {
     printf "${GREEN}✓ Alias installed:   $INSTALL_DIR/$ALIAS_NAME${RESET}\n"
 
     install_config
+    setup_path
     return 0
 }
 
@@ -199,6 +231,7 @@ do_build_from_source() {
     printf "${GREEN}✓ Alias installed:   $INSTALL_DIR/$ALIAS_NAME${RESET}\n"
 
     install_config
+    setup_path
 
     cd "$HOME" || exit 1
 
