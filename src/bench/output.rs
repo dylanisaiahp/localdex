@@ -3,25 +3,8 @@ use chrono::Local;
 use std::collections::HashMap;
 use std::path::PathBuf;
 
-use crate::bench_runner::BenchConfig;
-use crate::bench_runner::BenchResult;
-
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
-fn fmt_num(n: f64) -> String {
-    let n = n as u64;
-    let s = n.to_string();
-    let mut result = String::new();
-    for (i, c) in s.chars().rev().enumerate() {
-        if i > 0 && i % 3 == 0 {
-            result.push(',');
-        }
-        result.push(c);
-    }
-    result.chars().rev().collect()
-}
+use crate::bench::runner::{BenchConfig, BenchResult};
+use crate::cli::display::fmt_num;
 
 // ---------------------------------------------------------------------------
 // Markdown output
@@ -30,42 +13,29 @@ fn fmt_num(n: f64) -> String {
 pub fn save_markdown(results: &[BenchResult], config: &BenchConfig, path: &PathBuf) -> Result<()> {
     let mut out = String::new();
 
-    // Header
     out.push_str("# ldx Benchmark Results\n\n");
-
     out.push_str(&format!("**Date:** {}\n", Local::now().format("%d %b %Y")));
     out.push_str(&format!("**Threads:** {}\n", config.threads));
     out.push_str(&format!("**Runs per dir:** {}\n\n", config.runs));
 
-    // Group results by directory
     let mut by_dir: HashMap<String, Vec<&BenchResult>> = HashMap::new();
     for r in results {
-        by_dir
-            .entry(r.dir.display().to_string())
-            .or_default()
-            .push(r);
+        by_dir.entry(r.dir.display().to_string()).or_default().push(r);
     }
 
-    // Preserve insertion order using config.dirs
     for dir in &config.dirs {
         let key = dir.display().to_string();
-        let Some(dir_results) = by_dir.get(&key) else {
-            continue;
-        };
+        let Some(dir_results) = by_dir.get(&key) else { continue; };
 
         out.push_str(&format!("## {}\n\n", key));
 
         if let Some(first) = dir_results.first() {
-            out.push_str(&format!(
-                "**Entries scanned:** {}\n\n",
-                fmt_num(first.entries as f64)
-            ));
+            out.push_str(&format!("**Entries scanned:** {}\n\n", fmt_num(first.entries)));
         }
 
         out.push_str("| Tool | Avg (entries/s) | Median | Min | Max |\n");
         out.push_str("|------|----------------|--------|-----|-----|\n");
 
-        // ldx first, then competitors
         let mut sorted = dir_results.to_vec();
         sorted.sort_by_key(|r| if r.tool == "ldx" { 0 } else { 1 });
 
@@ -73,10 +43,10 @@ pub fn save_markdown(results: &[BenchResult], config: &BenchConfig, path: &PathB
             out.push_str(&format!(
                 "| {} | {} | {} | {} | {} |\n",
                 r.tool,
-                fmt_num(r.avg),
-                fmt_num(r.median),
-                fmt_num(r.min),
-                fmt_num(r.max),
+                fmt_num(r.avg as usize),
+                fmt_num(r.median as usize),
+                fmt_num(r.min as usize),
+                fmt_num(r.max as usize),
             ));
         }
 
@@ -101,14 +71,8 @@ pub fn save_csv(results: &[BenchResult], path: &PathBuf) -> Result<()> {
     for r in results {
         out.push_str(&format!(
             "{},{},{},{:.0},{:.0},{:.0},{:.0},{}\n",
-            r.tool,
-            r.dir.display(),
-            r.entries,
-            r.avg,
-            r.median,
-            r.min,
-            r.max,
-            r.runs,
+            r.tool, r.dir.display(), r.entries,
+            r.avg, r.median, r.min, r.max, r.runs,
         ));
     }
 

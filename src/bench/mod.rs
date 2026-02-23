@@ -1,8 +1,10 @@
+pub mod output;
+pub mod runner;
 use anyhow::Result;
 use std::path::PathBuf;
 
-use crate::bench_output::{save_csv, save_markdown};
-use crate::bench_runner::{BenchConfig, run_benchmark};
+use crate::bench::output::{save_csv, save_markdown};
+use crate::bench::runner::{BenchConfig, run_benchmark};
 use crate::config::{LdxConfig, config_path};
 use chrono::Local;
 use dirs::home_dir;
@@ -38,7 +40,6 @@ pub fn parse_bench_args(raw: &[String], config: &LdxConfig) -> Result<BenchArgs>
     let mut csv = false;
     let mut edit = false;
 
-    // Reuse threads flag name from config
     let threads_flag = config
         .flags
         .values()
@@ -49,15 +50,9 @@ pub fn parse_bench_args(raw: &[String], config: &LdxConfig) -> Result<BenchArgs>
     let mut i = 0;
     while i < raw.len() {
         match raw[i].as_str() {
-            "--edit" => {
-                edit = true;
-            }
-            "--live" => {
-                live = true;
-            }
-            "--csv" => {
-                csv = true;
-            }
+            "--edit" => { edit = true; }
+            "--live" => { live = true; }
+            "--csv" => { csv = true; }
             "--runs" => {
                 i += 1;
                 runs = raw.get(i).and_then(|v| v.parse().ok()).unwrap_or(runs);
@@ -92,7 +87,6 @@ pub fn parse_bench_args(raw: &[String], config: &LdxConfig) -> Result<BenchArgs>
         i += 1;
     }
 
-    // Always include defaults, --dirs appends to them
     let mut default_dirs = Vec::new();
     if let Some(home) = home_dir() {
         default_dirs.push(home);
@@ -101,15 +95,7 @@ pub fn parse_bench_args(raw: &[String], config: &LdxConfig) -> Result<BenchArgs>
     default_dirs.push(PathBuf::from("/"));
     default_dirs.extend(dirs);
 
-    Ok(BenchArgs {
-        threads,
-        runs,
-        dirs: default_dirs,
-        out,
-        live,
-        csv,
-        edit,
-    })
+    Ok(BenchArgs { threads, runs, dirs: default_dirs, out, live, csv, edit })
 }
 
 // ---------------------------------------------------------------------------
@@ -117,7 +103,6 @@ pub fn parse_bench_args(raw: &[String], config: &LdxConfig) -> Result<BenchArgs>
 // ---------------------------------------------------------------------------
 
 pub fn run(raw: &[String], config: &LdxConfig) -> Result<()> {
-    // Help
     if raw.iter().any(|a| a == "--help" || a == "-h") {
         print_bench_help();
         return Ok(());
@@ -125,7 +110,6 @@ pub fn run(raw: &[String], config: &LdxConfig) -> Result<()> {
 
     let args = parse_bench_args(raw, config)?;
 
-    // --edit: open bench section of config
     if args.edit {
         let path = config_path();
         println!("Opening config: {}", path.display());
@@ -155,17 +139,12 @@ pub fn run(raw: &[String], config: &LdxConfig) -> Result<()> {
     println!("  Runs    : {}", args.runs);
     println!(
         "  Dirs    : {}",
-        args.dirs
-            .iter()
-            .map(|d| d.display().to_string())
-            .collect::<Vec<_>>()
-            .join(", ")
+        args.dirs.iter().map(|d| d.display().to_string()).collect::<Vec<_>>().join(", ")
     );
     println!();
 
     let results = run_benchmark(&bench_config)?;
 
-    // Output path
     let out_path = args.out.unwrap_or_else(|| {
         let ts = Local::now().format("%Y-%m-%d_%H-%M-%S");
         PathBuf::from(format!("ldx-bench-{}.md", ts))
@@ -181,7 +160,6 @@ pub fn run(raw: &[String], config: &LdxConfig) -> Result<()> {
     }
 
     println!();
-
     Ok(())
 }
 
@@ -191,10 +169,7 @@ pub fn run(raw: &[String], config: &LdxConfig) -> Result<()> {
 
 fn print_bench_help() {
     println!();
-    println!(
-        "  {} ldx bench — benchmark ldx against your filesystem",
-        colored::Colorize::cyan("🔍")
-    );
+    println!("  {} ldx bench — benchmark ldx against your filesystem", colored::Colorize::cyan("🔍"));
     println!();
     println!("  Usage: ldx bench [options]");
     println!();

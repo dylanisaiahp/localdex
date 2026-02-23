@@ -1,3 +1,4 @@
+pub mod check;
 use anyhow::Result;
 use serde::Deserialize;
 use std::collections::HashMap;
@@ -7,7 +8,7 @@ use std::path::PathBuf;
 // Default config — source of truth for --sync and --reset
 // ---------------------------------------------------------------------------
 
-pub const DEFAULT_CONFIG: &str = include_str!("../default_config.toml");
+pub const DEFAULT_CONFIG: &str = include_str!("../../default_config.toml");
 
 // ---------------------------------------------------------------------------
 // Config structures
@@ -79,8 +80,8 @@ pub fn is_flag_available(flag: &FlagDef) -> bool {
         || (cfg!(target_os = "macos") && flag.os == "macos")
 }
 
-// Re-export config management functions from config_check
-pub use crate::config_check::{check_config, reset_config, sync_config};
+// Re-export config management functions from check
+pub use crate::config::check::{check_config, reset_config, sync_config};
 
 // ---------------------------------------------------------------------------
 // Tests

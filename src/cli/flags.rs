@@ -42,10 +42,7 @@ pub fn expand_aliases(args: Vec<String>, config: &LdxConfig) -> Vec<String> {
     args.into_iter()
         .flat_map(|arg| {
             if let Some(expansion) = config.aliases.get(&arg) {
-                expansion
-                    .split_whitespace()
-                    .map(|s| s.to_string())
-                    .collect()
+                expansion.split_whitespace().map(|s| s.to_string()).collect()
             } else {
                 vec![arg]
             }
@@ -114,7 +111,6 @@ pub fn resolve_custom(args: Vec<String>, config: &LdxConfig) -> Vec<String> {
 // Helpers
 // ---------------------------------------------------------------------------
 
-/// Look up short/long flag names for a given target in config.
 fn get_flag_names(config: &LdxConfig, target: &str) -> (String, String) {
     config
         .flags
@@ -124,7 +120,6 @@ fn get_flag_names(config: &LdxConfig, target: &str) -> (String, String) {
         .unwrap_or_default()
 }
 
-/// Returns true if `arg` matches either the short or long form of a flag.
 fn flag_matches(arg: &str, short: &str, long: &str) -> bool {
     arg == short || arg == long
 }
@@ -135,13 +130,9 @@ fn flag_matches(arg: &str, short: &str, long: &str) -> bool {
 
 fn parse_management(raw: &[String], config: &LdxConfig) -> Option<ParsedFlags> {
     let (help_s, help_l) = get_flag_names(config, "help");
-    let max_threads = std::thread::available_parallelism()
-        .map(|n| n.get())
-        .unwrap_or(4);
+    let max_threads = std::thread::available_parallelism().map(|n| n.get()).unwrap_or(4);
 
-    let show_help = raw
-        .iter()
-        .any(|a| flag_matches(a, &help_s, &help_l) || a == "-h" || a == "--help");
+    let show_help = raw.iter().any(|a| flag_matches(a, &help_s, &help_l) || a == "-h" || a == "--help");
     let show_version = raw.iter().any(|a| a == "--version");
     let show_config = raw.iter().any(|a| a == "--config");
     let edit_config = raw.iter().any(|a| a == "--edit");
@@ -149,22 +140,10 @@ fn parse_management(raw: &[String], config: &LdxConfig) -> Option<ParsedFlags> {
     let sync_config = raw.iter().any(|a| a == "--sync");
     let reset_config = raw.iter().any(|a| a == "--reset");
 
-    if show_help
-        || show_version
-        || show_config
-        || edit_config
-        || check_config
-        || sync_config
-        || reset_config
-    {
+    if show_help || show_version || show_config || edit_config || check_config || sync_config || reset_config {
         return Some(ParsedFlags {
-            show_help,
-            show_version,
-            show_config,
-            edit_config,
-            check_config,
-            sync_config,
-            reset_config,
+            show_help, show_version, show_config, edit_config,
+            check_config, sync_config, reset_config,
             dir: ".".into(),
             threads: max_threads,
             ..Default::default()
@@ -175,7 +154,7 @@ fn parse_management(raw: &[String], config: &LdxConfig) -> Option<ParsedFlags> {
 }
 
 // ---------------------------------------------------------------------------
-// Value flags (flags that consume the next arg)
+// Value flags
 // ---------------------------------------------------------------------------
 
 struct ValueFlags {
@@ -187,39 +166,28 @@ struct ValueFlags {
 }
 
 fn parse_value_flags(raw: &[String], config: &LdxConfig) -> ValueFlags {
-    let max_threads = std::thread::available_parallelism()
-        .map(|n| n.get())
-        .unwrap_or(4);
+    let max_threads = std::thread::available_parallelism().map(|n| n.get()).unwrap_or(4);
 
     let (ext_s, ext_l) = get_flag_names(config, "extension");
     let (dir_s, dir_l) = get_flag_names(config, "dir");
     let (threads_s, threads_l) = get_flag_names(config, "threads");
     let (limit_s, limit_l) = get_flag_names(config, "limit");
 
-    let extension = raw
-        .iter()
-        .position(|a| flag_matches(a, &ext_s, &ext_l))
+    let extension = raw.iter().position(|a| flag_matches(a, &ext_s, &ext_l))
         .and_then(|i| raw.get(i + 1))
         .map(|s| s.trim_start_matches('.').to_lowercase());
 
-    let dir = raw
-        .iter()
-        .position(|a| flag_matches(a, &dir_s, &dir_l))
+    let dir = raw.iter().position(|a| flag_matches(a, &dir_s, &dir_l))
         .and_then(|i| raw.get(i + 1))
         .map(PathBuf::from)
         .unwrap_or_else(|| ".".into());
 
-    let threads = raw
-        .iter()
-        .position(|a| flag_matches(a, &threads_s, &threads_l))
+    let threads = raw.iter().position(|a| flag_matches(a, &threads_s, &threads_l))
         .and_then(|i| raw.get(i + 1))
         .and_then(|v| v.parse().ok())
         .map(|n: usize| {
             if n > max_threads {
-                eprintln!(
-                    "Warning: {} threads requested but only {} logical cores available. Capping at {}.",
-                    n, max_threads, max_threads
-                );
+                eprintln!("Warning: {} threads requested but only {} logical cores available. Capping at {}.", n, max_threads, max_threads);
                 max_threads
             } else {
                 n
@@ -227,26 +195,16 @@ fn parse_value_flags(raw: &[String], config: &LdxConfig) -> ValueFlags {
         })
         .unwrap_or(max_threads);
 
-    let limit = raw
-        .iter()
-        .position(|a| flag_matches(a, &limit_s, &limit_l))
+    let limit = raw.iter().position(|a| flag_matches(a, &limit_s, &limit_l))
         .and_then(|i| raw.get(i + 1))
         .and_then(|v| v.parse().ok());
 
-    let exclude = raw
-        .iter()
-        .position(|a| a == "--exclude")
+    let exclude = raw.iter().position(|a| a == "--exclude")
         .and_then(|i| raw.get(i + 1))
         .map(|s| s.split(',').map(|p| p.trim().to_string()).collect())
         .unwrap_or_default();
 
-    ValueFlags {
-        extension,
-        dir,
-        threads,
-        limit,
-        exclude,
-    }
+    ValueFlags { extension, dir, threads, limit, exclude }
 }
 
 // ---------------------------------------------------------------------------
@@ -254,17 +212,9 @@ fn parse_value_flags(raw: &[String], config: &LdxConfig) -> ValueFlags {
 // ---------------------------------------------------------------------------
 
 struct BoolFlags {
-    quiet: bool,
-    stats: bool,
-    all: bool,
-    verbose: bool,
-    first: bool,
-    open: bool,
-    dirs_only: bool,
-    where_mode: bool,
-    case_sensitive: bool,
-    all_drives: bool,
-    warn: bool,
+    quiet: bool, stats: bool, all: bool, verbose: bool,
+    first: bool, open: bool, dirs_only: bool, where_mode: bool,
+    case_sensitive: bool, all_drives: bool, warn: bool,
 }
 
 fn parse_bool_flags(raw: &[String], config: &LdxConfig) -> BoolFlags {
@@ -282,10 +232,7 @@ fn parse_bool_flags(raw: &[String], config: &LdxConfig) -> BoolFlags {
     #[cfg(windows)]
     let all_drives = raw.iter().any(|a| flag_matches(a, &drives_s, &drives_l));
     #[cfg(not(windows))]
-    let all_drives = {
-        let _ = (&drives_s, &drives_l);
-        false
-    };
+    let all_drives = { let _ = (&drives_s, &drives_l); false };
 
     BoolFlags {
         quiet: raw.iter().any(|a| flag_matches(a, &quiet_s, &quiet_l)),
@@ -312,17 +259,7 @@ fn parse_pattern(raw: &[String], config: &LdxConfig) -> Result<Option<String>> {
         let (dir_s, dir_l) = get_flag_names(config, "dir");
         let (threads_s, threads_l) = get_flag_names(config, "threads");
         let (limit_s, limit_l) = get_flag_names(config, "limit");
-        vec![
-            ext_s,
-            ext_l,
-            dir_s,
-            dir_l,
-            threads_s,
-            threads_l,
-            limit_s,
-            limit_l,
-            "--exclude".into(),
-        ]
+        vec![ext_s, ext_l, dir_s, dir_l, threads_s, threads_l, limit_s, limit_l, "--exclude".into()]
     };
 
     let known_flags: Vec<String> = config
@@ -330,20 +267,8 @@ fn parse_pattern(raw: &[String], config: &LdxConfig) -> Result<Option<String>> {
         .values()
         .flat_map(|f| vec![format!("-{}", f.short), format!("--{}", f.long)])
         .chain(
-            [
-                "--version",
-                "--help",
-                "-h",
-                "--config",
-                "--edit",
-                "--check",
-                "--sync",
-                "--reset",
-                "--exclude",
-                "--warn",
-            ]
-            .iter()
-            .map(|s| s.to_string()),
+            ["--version", "--help", "-h", "--config", "--edit", "--check", "--sync", "--reset", "--exclude", "--warn"]
+                .iter().map(|s| s.to_string()),
         )
         .collect();
 
@@ -351,14 +276,8 @@ fn parse_pattern(raw: &[String], config: &LdxConfig) -> Result<Option<String>> {
     let mut skip_next = false;
 
     for arg in raw {
-        if skip_next {
-            skip_next = false;
-            continue;
-        }
-        if value_flag_names.contains(arg) {
-            skip_next = true;
-            continue;
-        }
+        if skip_next { skip_next = false; continue; }
+        if value_flag_names.contains(arg) { skip_next = true; continue; }
         if arg.starts_with('-') {
             if !known_flags.contains(arg) {
                 bail!("Unknown flag: {:?}. Run with --help for usage.", arg);
@@ -375,7 +294,7 @@ fn parse_pattern(raw: &[String], config: &LdxConfig) -> Result<Option<String>> {
 // Validate flag combinations
 // ---------------------------------------------------------------------------
 
-fn validate_combos(
+pub fn validate_combos(
     pattern: &Option<String>,
     extension: &Option<String>,
     first: bool,
@@ -403,9 +322,7 @@ fn validate_combos(
         bail!("Cannot use both a pattern and -e/--extension at the same time.");
     }
     if !all && pattern.is_none() && extension.is_none() {
-        bail!(
-            "Either a pattern, -e/--extension, or -a/--all-files is required. Run with --help for usage."
-        );
+        bail!("Either a pattern, -e/--extension, or -a/--all-files is required. Run with --help for usage.");
     }
     Ok(())
 }
@@ -419,7 +336,6 @@ pub fn parse_args(config: &LdxConfig) -> Result<ParsedFlags> {
     let raw = expand_aliases(raw, config);
     let raw = resolve_custom(raw, config);
 
-    // Early exit for management flags
     if let Some(flags) = parse_management(&raw, config) {
         return Ok(flags);
     }
@@ -428,46 +344,19 @@ pub fn parse_args(config: &LdxConfig) -> Result<ParsedFlags> {
     let b = parse_bool_flags(&raw, config);
     let pattern = parse_pattern(&raw, config)?;
 
-    validate_combos(
-        &pattern,
-        &v.extension,
-        b.first,
-        v.limit,
-        b.all,
-        b.open,
-        b.dirs_only,
-    )?;
+    validate_combos(&pattern, &v.extension, b.first, v.limit, b.all, b.open, b.dirs_only)?;
 
-    let limit = if b.first || b.where_mode {
-        Some(1)
-    } else {
-        v.limit
-    };
+    let limit = if b.first || b.where_mode { Some(1) } else { v.limit };
 
     Ok(ParsedFlags {
-        pattern,
-        dir: v.dir,
-        extension: v.extension,
-        threads: v.threads,
-        quiet: b.quiet,
-        stats: b.stats,
-        all: b.all,
-        verbose: b.verbose,
-        open: b.open,
-        dirs_only: b.dirs_only,
-        where_mode: b.where_mode,
-        all_drives: b.all_drives,
-        case_sensitive: b.case_sensitive,
-        limit,
-        exclude: v.exclude,
-        show_help: false,
-        show_version: false,
-        show_config: false,
-        edit_config: false,
-        check_config: false,
-        sync_config: false,
-        reset_config: false,
-        warn: b.warn,
+        pattern, dir: v.dir, extension: v.extension, threads: v.threads,
+        quiet: b.quiet, stats: b.stats, all: b.all, verbose: b.verbose,
+        open: b.open, dirs_only: b.dirs_only, where_mode: b.where_mode,
+        all_drives: b.all_drives, case_sensitive: b.case_sensitive,
+        limit, exclude: v.exclude,
+        show_help: false, show_version: false, show_config: false,
+        edit_config: false, check_config: false, sync_config: false,
+        reset_config: false, warn: b.warn,
     })
 }
 
@@ -498,14 +387,8 @@ mod tests {
             description: "Stats".into(), os: "all".into(),
             action: None, target: Some("stats".into()), value: None,
         });
-        LdxConfig {
-            flags,
-            custom: HashMap::new(),
-            aliases: HashMap::new(),
-        }
+        LdxConfig { flags, custom: HashMap::new(), aliases: HashMap::new() }
     }
-
-    // ── expand_aliases ────────────────────────────────────────────────────
 
     #[test]
     fn expand_aliases_replaces_known_alias() {
@@ -537,8 +420,6 @@ mod tests {
         assert_eq!(expanded, vec!["-a", "-S", "-q"]);
     }
 
-    // ── resolve_custom ────────────────────────────────────────────────────
-
     #[test]
     fn resolve_custom_expands_set_value_flag() {
         let mut config = make_config();
@@ -559,8 +440,6 @@ mod tests {
         let resolved = resolve_custom(vec!["invoice".to_string(), "-q".to_string()], &config);
         assert_eq!(resolved, vec!["invoice", "-q"]);
     }
-
-    // ── validate_combos ───────────────────────────────────────────────────
 
     #[test]
     fn validate_rejects_first_and_limit() {

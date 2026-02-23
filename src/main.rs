@@ -1,11 +1,6 @@
 mod bench;
-mod bench_output;
-mod bench_runner;
+mod cli;
 mod config;
-mod config_check;
-mod display;
-mod flags;
-mod launcher;
 mod search;
 mod source;
 
@@ -16,14 +11,13 @@ use std::path::PathBuf;
 use colored::Colorize;
 use config::{check_config, config_path, load_config, reset_config, sync_config};
 #[cfg(windows)]
-use display::fmt_num;
-use display::{print_help, print_result, print_stats};
-use flags::{ParsedFlags, parse_args};
-use launcher::{open_file, prompt_and_open};
+use cli::display::fmt_num;
+use cli::display::{print_help, print_result, print_stats};
+use cli::flags::{ParsedFlags, parse_args};
+use cli::launcher::{open_file, prompt_and_open};
 use search::{Config, ScanResult, scan_dir};
 #[cfg(windows)]
 use std::time::Instant;
-
 #[cfg(windows)]
 use source::get_all_drives;
 

@@ -22,7 +22,6 @@ pub fn fmt_num(n: usize) -> String {
 // ---------------------------------------------------------------------------
 
 pub fn print_help(config: &LdxConfig) {
-    // ── Header ───────────────────────────────────────────────────────────────
     println!();
     println!(
         "  {}  {}",
@@ -31,39 +30,23 @@ pub fn print_help(config: &LdxConfig) {
     );
     println!(
         "  {}",
-        format!(
-            "v{} · github.com/dylanisaiahp/localdex",
-            env!("CARGO_PKG_VERSION")
-        )
-        .dimmed()
+        format!("v{} · github.com/dylanisaiahp/localdex", env!("CARGO_PKG_VERSION")).dimmed()
     );
     println!();
-
-    // ── Usage ─────────────────────────────────────────────────────────────────
     println!(
         "  {} {} {}",
-        "Usage:".bold(),
-        "ldx".bright_cyan(),
-        "[pattern] [options]".dimmed()
+        "Usage:".bold(), "ldx".bright_cyan(), "[pattern] [options]".dimmed()
     );
     println!();
-
-    // ── Tip ───────────────────────────────────────────────────────────────────
     println!(
         "  {}  {}",
         "Tip:".bold(),
         "-d = where to search  -D = find dirs  -s = case-sensitive  -S = stats  --edit to customize".dimmed()
     );
     println!();
-
-    // ── Flags ─────────────────────────────────────────────────────────────────
     println!("  {}", "Flags:".bold());
 
-    let mut flags: Vec<&FlagDef> = config
-        .flags
-        .values()
-        .filter(|f| is_flag_available(f))
-        .collect();
+    let mut flags: Vec<&FlagDef> = config.flags.values().filter(|f| is_flag_available(f)).collect();
     flags.sort_by(|a, b| a.long.cmp(&b.long));
 
     for flag in &flags {
@@ -75,7 +58,6 @@ pub fn print_help(config: &LdxConfig) {
         );
     }
 
-    // Management flags (not in config)
     let mgmt: &[(&str, &str)] = &[
         ("--check", "Validate config"),
         ("--config", "Show config path"),
@@ -87,40 +69,24 @@ pub fn print_help(config: &LdxConfig) {
     println!();
     println!("  {}", "Management:".bold());
     for (flag, desc) in mgmt {
-        println!(
-            "    {}  {:<28} {}",
-            "  ".dimmed(),
-            flag.cyan(),
-            desc.dimmed()
-        );
+        println!("    {}  {:<28} {}", "  ".dimmed(), flag.cyan(), desc.dimmed());
     }
 
-    // ── User aliases ──────────────────────────────────────────────────────────
     if !config.aliases.is_empty() {
         println!();
         println!("  {}", "Your Aliases:".bold());
-
         let mut aliases: Vec<(&String, &String)> = config.aliases.iter().collect();
         aliases.sort_by_key(|(k, _)| k.as_str());
-
         for (name, expansion) in &aliases {
-            println!(
-                "    {:<16} {}  {}",
-                name.bright_cyan(),
-                "→".dimmed(),
-                expansion.dimmed()
-            );
+            println!("    {:<16} {}  {}", name.bright_cyan(), "→".dimmed(), expansion.dimmed());
         }
     }
 
-    // ── User custom flags ─────────────────────────────────────────────────────
     if !config.custom.is_empty() {
         println!();
         println!("  {}", "Your Custom Flags:".bold());
-
         let mut custom: Vec<(&String, &crate::config::FlagDef)> = config.custom.iter().collect();
         custom.sort_by_key(|(_, f)| f.long.as_str());
-
         for (_, flag) in &custom {
             println!(
                 "    {}  {:<28} {}",
@@ -141,7 +107,7 @@ pub fn print_help(config: &LdxConfig) {
 pub fn print_result(
     result: &crate::search::ScanResult,
     reported_matches: usize,
-    f: &crate::flags::ParsedFlags,
+    f: &crate::cli::flags::ParsedFlags,
     indent: &str,
 ) {
     if f.all {
@@ -177,7 +143,7 @@ pub fn print_result(
 
 pub fn print_stats(
     result: &crate::search::ScanResult,
-    f: &crate::flags::ParsedFlags,
+    f: &crate::cli::flags::ParsedFlags,
     indent: &str,
 ) {
     let s = result.duration.as_secs_f64();
