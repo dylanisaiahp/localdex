@@ -1,8 +1,8 @@
 use anyhow::Result;
 use std::path::PathBuf;
 
+use crate::bench_output::{save_csv, save_markdown};
 use crate::bench_runner::{BenchConfig, run_benchmark};
-use crate::bench_output::{save_markdown, save_csv};
 use crate::config::{LdxConfig, config_path};
 use chrono::Local;
 use dirs::home_dir;
@@ -12,13 +12,13 @@ use dirs::home_dir;
 // ---------------------------------------------------------------------------
 
 pub struct BenchArgs {
-    pub threads:  usize,
-    pub runs:     usize,
-    pub dirs:     Vec<PathBuf>,
-    pub out:      Option<PathBuf>,
-    pub live:     bool,
-    pub csv:      bool,
-    pub edit:     bool,
+    pub threads: usize,
+    pub runs: usize,
+    pub dirs: Vec<PathBuf>,
+    pub out: Option<PathBuf>,
+    pub live: bool,
+    pub csv: bool,
+    pub edit: bool,
 }
 
 // ---------------------------------------------------------------------------
@@ -31,12 +31,12 @@ pub fn parse_bench_args(raw: &[String], config: &LdxConfig) -> Result<BenchArgs>
         .unwrap_or(4);
 
     let mut threads = max_threads;
-    let mut runs    = 10;
+    let mut runs = 10;
     let mut dirs: Vec<PathBuf> = Vec::new();
-    let mut out:  Option<PathBuf> = None;
-    let mut live  = false;
-    let mut csv   = false;
-    let mut edit  = false;
+    let mut out: Option<PathBuf> = None;
+    let mut live = false;
+    let mut csv = false;
+    let mut edit = false;
 
     // Reuse threads flag name from config
     let threads_flag = config
@@ -49,20 +49,24 @@ pub fn parse_bench_args(raw: &[String], config: &LdxConfig) -> Result<BenchArgs>
     let mut i = 0;
     while i < raw.len() {
         match raw[i].as_str() {
-            "--edit"  => { edit = true; }
-            "--live"  => { live = true; }
-            "--csv"   => { csv  = true; }
-            "--runs"  => {
-                i += 1;
-                runs = raw.get(i)
-                    .and_then(|v| v.parse().ok())
-                    .unwrap_or(runs);
+            "--edit" => {
+                edit = true;
             }
-            "--out"   => {
+            "--live" => {
+                live = true;
+            }
+            "--csv" => {
+                csv = true;
+            }
+            "--runs" => {
+                i += 1;
+                runs = raw.get(i).and_then(|v| v.parse().ok()).unwrap_or(runs);
+            }
+            "--out" => {
                 i += 1;
                 out = raw.get(i).map(PathBuf::from);
             }
-            "--dirs"  => {
+            "--dirs" => {
                 i += 1;
                 while i < raw.len() && !raw[i].starts_with('-') {
                     dirs.push(PathBuf::from(&raw[i]));
@@ -72,13 +76,17 @@ pub fn parse_bench_args(raw: &[String], config: &LdxConfig) -> Result<BenchArgs>
             }
             flag if flag == threads_flag || flag == "--threads" => {
                 i += 1;
-                threads = raw.get(i)
+                threads = raw
+                    .get(i)
                     .and_then(|v| v.parse().ok())
                     .map(|n: usize| n.min(max_threads))
                     .unwrap_or(threads);
             }
             unknown => {
-                anyhow::bail!("Unknown bench flag: {:?}. Run `ldx bench --help` for usage.", unknown);
+                anyhow::bail!(
+                    "Unknown bench flag: {:?}. Run `ldx bench --help` for usage.",
+                    unknown
+                );
             }
         }
         i += 1;
@@ -93,7 +101,15 @@ pub fn parse_bench_args(raw: &[String], config: &LdxConfig) -> Result<BenchArgs>
     default_dirs.push(PathBuf::from("/"));
     default_dirs.extend(dirs);
 
-    Ok(BenchArgs { threads, runs, dirs: default_dirs, out, live, csv, edit })
+    Ok(BenchArgs {
+        threads,
+        runs,
+        dirs: default_dirs,
+        out,
+        live,
+        csv,
+        edit,
+    })
 }
 
 // ---------------------------------------------------------------------------
@@ -128,19 +144,23 @@ pub fn run(raw: &[String], config: &LdxConfig) -> Result<()> {
 
     let bench_config = BenchConfig {
         threads: args.threads,
-        runs:    args.runs,
-        dirs:    args.dirs.clone(),
-        live:    args.live,
+        runs: args.runs,
+        dirs: args.dirs.clone(),
+        live: args.live,
     };
 
     println!();
     println!("  {} ldx bench", colored::Colorize::cyan("🔍"));
     println!("  Threads : {}", args.threads);
     println!("  Runs    : {}", args.runs);
-    println!("  Dirs    : {}", args.dirs.iter()
-        .map(|d| d.display().to_string())
-        .collect::<Vec<_>>()
-        .join(", "));
+    println!(
+        "  Dirs    : {}",
+        args.dirs
+            .iter()
+            .map(|d| d.display().to_string())
+            .collect::<Vec<_>>()
+            .join(", ")
+    );
     println!();
 
     let results = run_benchmark(&bench_config)?;
@@ -171,7 +191,10 @@ pub fn run(raw: &[String], config: &LdxConfig) -> Result<()> {
 
 fn print_bench_help() {
     println!();
-    println!("  {} ldx bench — benchmark ldx against your filesystem", colored::Colorize::cyan("🔍"));
+    println!(
+        "  {} ldx bench — benchmark ldx against your filesystem",
+        colored::Colorize::cyan("🔍")
+    );
     println!();
     println!("  Usage: ldx bench [options]");
     println!();

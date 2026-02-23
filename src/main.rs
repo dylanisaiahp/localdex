@@ -13,16 +13,16 @@ use anyhow::Result;
 use dirs::home_dir;
 use std::path::PathBuf;
 
-use config::{check_config, config_path, load_config, reset_config, sync_config};
 use colored::Colorize;
-#[cfg(windows)]
-use std::time::Instant;
-use display::{print_help, print_result, print_stats};
+use config::{check_config, config_path, load_config, reset_config, sync_config};
 #[cfg(windows)]
 use display::fmt_num;
+use display::{print_help, print_result, print_stats};
 use flags::{ParsedFlags, parse_args};
 use launcher::{open_file, prompt_and_open};
 use search::{Config, ScanResult, scan_dir};
+#[cfg(windows)]
+use std::time::Instant;
 
 #[cfg(windows)]
 use source::get_all_drives;
@@ -97,7 +97,11 @@ fn print_warnings(result: &ScanResult, f: &ParsedFlags) {
     if !f.warn || result.errors.is_empty() {
         return;
     }
-    eprintln!("⚠ {} path{} skipped:", result.errors.len(), if result.errors.len() == 1 { "" } else { "s" });
+    eprintln!(
+        "⚠ {} path{} skipped:",
+        result.errors.len(),
+        if result.errors.len() == 1 { "" } else { "s" }
+    );
     for err in &result.errors {
         if let Some(path) = err.path() {
             eprintln!("  {} {}", "skipped:".yellow(), path.display());

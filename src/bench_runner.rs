@@ -10,9 +10,9 @@ use crate::search::{Config as SearchConfig, scan_dir};
 
 pub struct BenchConfig {
     pub threads: usize,
-    pub runs:    usize,
-    pub dirs:    Vec<PathBuf>,
-    pub live:    bool,
+    pub runs: usize,
+    pub dirs: Vec<PathBuf>,
+    pub live: bool,
 }
 
 // ---------------------------------------------------------------------------
@@ -20,13 +20,13 @@ pub struct BenchConfig {
 // ---------------------------------------------------------------------------
 
 pub struct BenchResult {
-    pub tool:    String,
-    pub dir:     PathBuf,
-    pub avg:     f64,
-    pub median:  f64,
-    pub min:     f64,
-    pub max:     f64,
-    pub runs:    usize,
+    pub tool: String,
+    pub dir: PathBuf,
+    pub avg: f64,
+    pub median: f64,
+    pub min: f64,
+    pub max: f64,
+    pub runs: usize,
     pub entries: usize,
 }
 
@@ -90,23 +90,26 @@ fn clear_progress(live: bool) {
 fn bench_ldx(dir: &PathBuf, config: &BenchConfig) -> Option<BenchResult> {
     let search_config = SearchConfig {
         case_sensitive: false,
-        quiet:          true,
-        all:            true,
-        dirs_only:      false,
-        extension:      None,
-        pattern:        None,
-        limit:          None,
-        threads:        config.threads,
-        collect_paths:  false,
+        quiet: true,
+        all: true,
+        dirs_only: false,
+        extension: None,
+        pattern: None,
+        limit: None,
+        threads: config.threads,
+        collect_paths: false,
         collect_errors: false,
-        exclude:        vec![],
+        exclude: vec![],
     };
 
-    let mut speeds  = Vec::new();
+    let mut speeds = Vec::new();
     let mut entries = 0usize;
 
     for i in 0..config.runs {
-        progress(config.live, &format!("ldx  {} [{}/{}]", dir.display(), i + 1, config.runs));
+        progress(
+            config.live,
+            &format!("ldx  {} [{}/{}]", dir.display(), i + 1, config.runs),
+        );
 
         let result = scan_dir(dir, &search_config);
         let e = result.files + result.dirs;
@@ -124,15 +127,31 @@ fn bench_ldx(dir: &PathBuf, config: &BenchConfig) -> Option<BenchResult> {
 
     clear_progress(config.live);
 
-    if speeds.is_empty() { return None; }
+    if speeds.is_empty() {
+        return None;
+    }
 
     let (avg, median, min, max) = calc_stats(speeds);
     if config.live {
-        println!("    ldx  avg {} | med {} | min {} | max {} entries/s",
-            fmt_speed(avg), fmt_speed(median), fmt_speed(min), fmt_speed(max));
+        println!(
+            "    ldx  avg {} | med {} | min {} | max {} entries/s",
+            fmt_speed(avg),
+            fmt_speed(median),
+            fmt_speed(min),
+            fmt_speed(max)
+        );
     }
 
-    Some(BenchResult { tool: "ldx".to_string(), dir: dir.clone(), avg, median, min, max, runs: config.runs, entries })
+    Some(BenchResult {
+        tool: "ldx".to_string(),
+        dir: dir.clone(),
+        avg,
+        median,
+        min,
+        max,
+        runs: config.runs,
+        entries,
+    })
 }
 
 // ---------------------------------------------------------------------------
@@ -140,11 +159,14 @@ fn bench_ldx(dir: &PathBuf, config: &BenchConfig) -> Option<BenchResult> {
 // ---------------------------------------------------------------------------
 
 fn bench_competitor(tool: &str, dir: &PathBuf, config: &BenchConfig) -> Option<BenchResult> {
-    let mut speeds  = Vec::new();
+    let mut speeds = Vec::new();
     let mut entries = 0usize;
 
     for i in 0..config.runs {
-        progress(config.live, &format!("{}  {} [{}/{}]", tool, dir.display(), i + 1, config.runs));
+        progress(
+            config.live,
+            &format!("{}  {} [{}/{}]", tool, dir.display(), i + 1, config.runs),
+        );
 
         let start = Instant::now();
 
@@ -165,7 +187,9 @@ fn bench_competitor(tool: &str, dir: &PathBuf, config: &BenchConfig) -> Option<B
         let elapsed = start.elapsed().as_secs_f64();
 
         if let Ok(out) = output {
-            let e = out.stdout.split(|&b| b == b'\n')
+            let e = out
+                .stdout
+                .split(|&b| b == b'\n')
                 .filter(|l| !l.is_empty())
                 .count();
 
@@ -174,7 +198,13 @@ fn bench_competitor(tool: &str, dir: &PathBuf, config: &BenchConfig) -> Option<B
                 speeds.push(speed);
                 entries = e;
                 if config.live {
-                    println!("    {}  run {:>2}  {} entries/s  ({} entries)", tool, i + 1, fmt_speed(speed), e);
+                    println!(
+                        "    {}  run {:>2}  {} entries/s  ({} entries)",
+                        tool,
+                        i + 1,
+                        fmt_speed(speed),
+                        e
+                    );
                 }
             }
         }
@@ -182,15 +212,32 @@ fn bench_competitor(tool: &str, dir: &PathBuf, config: &BenchConfig) -> Option<B
 
     clear_progress(config.live);
 
-    if speeds.is_empty() { return None; }
+    if speeds.is_empty() {
+        return None;
+    }
 
     let (avg, median, min, max) = calc_stats(speeds);
     if config.live {
-        println!("    {}  avg {} | med {} | min {} | max {} entries/s",
-            tool, fmt_speed(avg), fmt_speed(median), fmt_speed(min), fmt_speed(max));
+        println!(
+            "    {}  avg {} | med {} | min {} | max {} entries/s",
+            tool,
+            fmt_speed(avg),
+            fmt_speed(median),
+            fmt_speed(min),
+            fmt_speed(max)
+        );
     }
 
-    Some(BenchResult { tool: tool.to_string(), dir: dir.clone(), avg, median, min, max, runs: config.runs, entries })
+    Some(BenchResult {
+        tool: tool.to_string(),
+        dir: dir.clone(),
+        avg,
+        median,
+        min,
+        max,
+        runs: config.runs,
+        entries,
+    })
 }
 
 // ---------------------------------------------------------------------------
@@ -202,7 +249,9 @@ fn fmt_speed(n: f64) -> String {
     let s = n.to_string();
     let mut result = String::new();
     for (i, c) in s.chars().rev().enumerate() {
-        if i > 0 && i % 3 == 0 { result.push(','); }
+        if i > 0 && i % 3 == 0 {
+            result.push(',');
+        }
         result.push(c);
     }
     result.chars().rev().collect()
@@ -238,7 +287,9 @@ pub fn run_benchmark(config: &BenchConfig) -> Result<Vec<BenchResult>> {
             }
         }
 
-        if config.live { println!(); }
+        if config.live {
+            println!();
+        }
         println!("  ✓ {}", dir.display());
     }
 

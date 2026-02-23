@@ -470,3 +470,150 @@ pub fn parse_args(config: &LdxConfig) -> Result<ParsedFlags> {
         warn: b.warn,
     })
 }
+
+// ---------------------------------------------------------------------------
+// Tests
+// ---------------------------------------------------------------------------
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::collections::HashMap;
+    use crate::config::FlagDef;
+
+    fn make_config() -> LdxConfig {
+        let mut flags = HashMap::new();
+        flags.insert("extension".into(), FlagDef {
+            short: "e".into(), long: "extension".into(),
+            description: "Extension".into(), os: "all".into(),
+            action: None, target: Some("extension".into()), value: None,
+        });
+        flags.insert("quiet".into(), FlagDef {
+            short: "q".into(), long: "quiet".into(),
+            description: "Quiet".into(), os: "all".into(),
+            action: None, target: Some("quiet".into()), value: None,
+        });
+        flags.insert("stats".into(), FlagDef {
+            short: "S".into(), long: "stats".into(),
+            description: "Stats".into(), os: "all".into(),
+            action: None, target: Some("stats".into()), value: None,
+        });
+        LdxConfig {
+            flags,
+            custom: HashMap::new(),
+            aliases: HashMap::new(),
+        }
+    }
+
+    // ── expand_aliases ────────────────────────────────────────────────────
+
+    #[test]
+    fn expand_aliases_replaces_known_alias() {
+        let mut config = make_config();
+        config.aliases.insert("ct".into(), "-a -S -q".into());
+        let expanded = expand_aliases(vec!["ct".to_string()], &config);
+        assert_eq!(expanded, vec!["-a", "-S", "-q"]);
+    }
+
+    #[test]
+    fn expand_aliases_leaves_unknown_args_untouched() {
+        let config = make_config();
+        let expanded = expand_aliases(vec!["invoice".to_string(), "-q".to_string()], &config);
+        assert_eq!(expanded, vec!["invoice", "-q"]);
+    }
+
+    #[test]
+    fn expand_aliases_handles_empty_args() {
+        let config = make_config();
+        assert!(expand_aliases(vec![], &config).is_empty());
+    }
+
+    #[test]
+    fn expand_aliases_expands_multiple_aliases() {
+        let mut config = make_config();
+        config.aliases.insert("ct".into(), "-a -S".into());
+        config.aliases.insert("qq".into(), "-q".into());
+        let expanded = expand_aliases(vec!["ct".to_string(), "qq".to_string()], &config);
+        assert_eq!(expanded, vec!["-a", "-S", "-q"]);
+    }
+
+    // ── resolve_custom ────────────────────────────────────────────────────
+
+    #[test]
+    fn resolve_custom_expands_set_value_flag() {
+        let mut config = make_config();
+        config.custom.insert("rust".into(), FlagDef {
+            short: "R".into(), long: "rust".into(),
+            description: "Rust files".into(), os: "all".into(),
+            action: Some("set_value".into()),
+            target: Some("extension".into()),
+            value: Some("rs".into()),
+        });
+        let resolved = resolve_custom(vec!["-R".to_string()], &config);
+        assert_eq!(resolved, vec!["-e", "rs"]);
+    }
+
+    #[test]
+    fn resolve_custom_leaves_unknown_args_untouched() {
+        let config = make_config();
+        let resolved = resolve_custom(vec!["invoice".to_string(), "-q".to_string()], &config);
+        assert_eq!(resolved, vec!["invoice", "-q"]);
+    }
+
+    // ── validate_combos ───────────────────────────────────────────────────
+
+    #[test]
+    fn validate_rejects_first_and_limit() {
+        assert!(validate_combos(&None, &None, true, Some(5), false, false, false).is_err());
+    }
+
+    #[test]
+    fn validate_rejects_all_with_pattern() {
+        assert!(validate_combos(&Some("invoice".into()), &None, false, None, true, false, false).is_err());
+    }
+
+    #[test]
+    fn validate_rejects_all_with_extension() {
+        assert!(validate_combos(&None, &Some("rs".into()), false, None, true, false, false).is_err());
+    }
+
+    #[test]
+    fn validate_rejects_open_with_all() {
+        assert!(validate_combos(&None, &None, false, None, true, true, false).is_err());
+    }
+
+    #[test]
+    fn validate_rejects_dirs_with_all() {
+        assert!(validate_combos(&None, &None, false, None, true, false, true).is_err());
+    }
+
+    #[test]
+    fn validate_rejects_dirs_with_extension() {
+        assert!(validate_combos(&None, &Some("rs".into()), false, None, false, false, true).is_err());
+    }
+
+    #[test]
+    fn validate_rejects_pattern_and_extension() {
+        assert!(validate_combos(&Some("invoice".into()), &Some("rs".into()), false, None, false, false, false).is_err());
+    }
+
+    #[test]
+    fn validate_rejects_no_search_criteria() {
+        assert!(validate_combos(&None, &None, false, None, false, false, false).is_err());
+    }
+
+    #[test]
+    fn validate_accepts_pattern_alone() {
+        assert!(validate_combos(&Some("invoice".into()), &None, false, None, false, false, false).is_ok());
+    }
+
+    #[test]
+    fn validate_accepts_all_alone() {
+        assert!(validate_combos(&None, &None, false, None, true, false, false).is_ok());
+    }
+
+    #[test]
+    fn validate_accepts_extension_alone() {
+        assert!(validate_combos(&None, &Some("rs".into()), false, None, false, false, false).is_ok());
+    }
+}

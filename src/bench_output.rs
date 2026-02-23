@@ -1,10 +1,10 @@
 use anyhow::Result;
+use chrono::Local;
 use std::collections::HashMap;
 use std::path::PathBuf;
-use chrono::Local;
 
-use crate::bench_runner::BenchResult;
 use crate::bench_runner::BenchConfig;
+use crate::bench_runner::BenchResult;
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -49,12 +49,17 @@ pub fn save_markdown(results: &[BenchResult], config: &BenchConfig, path: &PathB
     // Preserve insertion order using config.dirs
     for dir in &config.dirs {
         let key = dir.display().to_string();
-        let Some(dir_results) = by_dir.get(&key) else { continue };
+        let Some(dir_results) = by_dir.get(&key) else {
+            continue;
+        };
 
         out.push_str(&format!("## {}\n\n", key));
 
         if let Some(first) = dir_results.first() {
-            out.push_str(&format!("**Entries scanned:** {}\n\n", fmt_num(first.entries as f64)));
+            out.push_str(&format!(
+                "**Entries scanned:** {}\n\n",
+                fmt_num(first.entries as f64)
+            ));
         }
 
         out.push_str("| Tool | Avg (entries/s) | Median | Min | Max |\n");
@@ -110,5 +115,3 @@ pub fn save_csv(results: &[BenchResult], path: &PathBuf) -> Result<()> {
     std::fs::write(path, out)?;
     Ok(())
 }
-
-

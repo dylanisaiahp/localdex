@@ -81,3 +81,49 @@ pub fn is_flag_available(flag: &FlagDef) -> bool {
 
 // Re-export config management functions from config_check
 pub use crate::config_check::{check_config, reset_config, sync_config};
+
+// ---------------------------------------------------------------------------
+// Tests
+// ---------------------------------------------------------------------------
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn make_flag(os: &str) -> FlagDef {
+        FlagDef {
+            short: "q".into(), long: "quiet".into(),
+            description: "Quiet".into(), os: os.into(),
+            action: None, target: None, value: None,
+        }
+    }
+
+    #[test]
+    fn flag_available_for_all_os() {
+        assert!(is_flag_available(&make_flag("all")));
+    }
+
+    #[test]
+    fn flag_available_for_linux() {
+        #[cfg(target_os = "linux")]
+        assert!(is_flag_available(&make_flag("linux")));
+    }
+
+    #[test]
+    fn flag_not_available_for_windows_on_linux() {
+        #[cfg(target_os = "linux")]
+        assert!(!is_flag_available(&make_flag("windows")));
+    }
+
+    #[test]
+    fn flag_not_available_for_macos_on_linux() {
+        #[cfg(target_os = "linux")]
+        assert!(!is_flag_available(&make_flag("macos")));
+    }
+
+    #[test]
+    fn default_config_is_valid_toml() {
+        let result = toml::from_str::<LdxConfig>(DEFAULT_CONFIG);
+        assert!(result.is_ok(), "DEFAULT_CONFIG failed to parse: {:?}", result.err());
+    }
+}
