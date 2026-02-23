@@ -20,7 +20,7 @@
 ## 📦 Installation
 
 ```bash
-curl -sSf https://raw.githubusercontent.com/dylanisaiahp/localdex/main/scripts/install.sh | sh
+curl -sSf https://raw.githubusercontent.com/dylanisaiahp/localdex/main/install.sh | sh
 ```
 
 > **Windows:** Run via [Git Bash](https://gitforwindows.org/).
