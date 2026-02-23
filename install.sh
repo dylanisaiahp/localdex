@@ -1,6 +1,6 @@
 #!/usr/bin/env sh
 # install.sh — Install or uninstall ldx (localdex)
-# Usage: curl -sSf https://raw.githubusercontent.com/dylanisaiahp/localdex/main/scripts/install.sh | sh
+# Usage: curl -sSf https://raw.githubusercontent.com/dylanisaiahp/localdex/main/install.sh | sh
 
 # ─── Colors ───────────────────────────────────────────────────────────────────
 RED='\033[0;31m'
@@ -12,6 +12,7 @@ RESET='\033[0m'
 
 REPO_URL="https://github.com/dylanisaiahp/localdex"
 REPO_API="https://api.github.com/repos/dylanisaiahp/localdex/tags"
+RELEASES_API="https://api.github.com/repos/dylanisaiahp/localdex/releases/latest"
 BINARY_NAME="localdex"
 ALIAS_NAME="ldx"
 INSTALL_DIR="$HOME/.cargo/bin"
@@ -43,6 +44,30 @@ get_latest_version() {
     fi
 }
 
+detect_platform() {
+    OS="$(uname -s)"
+    ARCH="$(uname -m)"
+
+    case "$OS" in
+        Linux)
+            case "$ARCH" in
+                x86_64) PLATFORM="ldx-linux-x86_64" ;;
+                *) PLATFORM="" ;;
+            esac
+            ;;
+        Darwin)
+            case "$ARCH" in
+                x86_64|arm64) PLATFORM="ldx-macos-x86_64" ;;
+                *) PLATFORM="" ;;
+            esac
+            ;;
+        MINGW*|MSYS*|CYGWIN*)
+            PLATFORM="ldx-windows-x86_64.exe"
+            ;;
+        *) PLATFORM="" ;;
+    esac
+}
+
 check_cargo() {
     if ! command -v cargo > /dev/null 2>&1; then
         printf "${YELLOW}Rust/cargo not found. Installing via rustup...${RESET}\n"
@@ -60,6 +85,61 @@ check_git() {
         printf "${RED}git not found. Please install git and try again.${RESET}\n"
         exit 1
     fi
+}
+
+install_config() {
+    if [ -f "$INSTALL_DIR/config.toml" ]; then
+        printf "${GREEN}✓ config.toml already present — skipping (aliases preserved)${RESET}\n"
+    elif [ -f "default_config.toml" ]; then
+        cp "default_config.toml" "$INSTALL_DIR/config.toml"
+        printf "${GREEN}✓ config.toml generated${RESET}\n"
+    else
+        curl -sSf "https://raw.githubusercontent.com/dylanisaiahp/localdex/main/default_config.toml" \
+            -o "$INSTALL_DIR/config.toml" 2>/dev/null \
+            && printf "${GREEN}✓ config.toml downloaded${RESET}\n" \
+            || printf "${YELLOW}⚠ Run ldx --sync after install to generate config${RESET}\n"
+    fi
+}
+
+# ─── Binary download (fast path) ──────────────────────────────────────────────
+try_download_binary() {
+    detect_platform
+
+    if [ -z "$PLATFORM" ]; then
+        printf "${YELLOW}No pre-built binary for this platform — building from source${RESET}\n"
+        return 1
+    fi
+
+    printf "${CYAN}Detected platform: $PLATFORM${RESET}\n"
+    printf "${CYAN}Looking for pre-built binary...${RESET}\n"
+
+    DOWNLOAD_URL=$(curl -s "$RELEASES_API" 2>/dev/null \
+        | grep "browser_download_url" \
+        | grep "$PLATFORM" \
+        | grep -oE 'https://[^"]+' \
+        | head -1)
+
+    if [ -z "$DOWNLOAD_URL" ]; then
+        printf "${YELLOW}No pre-built binary found — building from source${RESET}\n"
+        return 1
+    fi
+
+    printf "${CYAN}Downloading binary...${RESET}\n"
+    mkdir -p "$INSTALL_DIR"
+    curl -sSfL "$DOWNLOAD_URL" -o "$INSTALL_DIR/$BINARY_NAME" 2>/dev/null
+
+    if [ $? -ne 0 ]; then
+        printf "${YELLOW}Download failed — building from source${RESET}\n"
+        return 1
+    fi
+
+    chmod +x "$INSTALL_DIR/$BINARY_NAME"
+    cp "$INSTALL_DIR/$BINARY_NAME" "$INSTALL_DIR/$ALIAS_NAME"
+    printf "${GREEN}✓ Binary installed:  $INSTALL_DIR/$BINARY_NAME${RESET}\n"
+    printf "${GREEN}✓ Alias installed:   $INSTALL_DIR/$ALIAS_NAME${RESET}\n"
+
+    install_config
+    return 0
 }
 
 # ─── Source location picker ───────────────────────────────────────────────────
@@ -86,8 +166,8 @@ pick_source_location() {
     esac
 }
 
-# ─── Build & install ──────────────────────────────────────────────────────────
-do_install() {
+# ─── Build from source ────────────────────────────────────────────────────────
+do_build_from_source() {
     KEEP_SOURCE="$1"
 
     check_cargo
@@ -118,14 +198,7 @@ do_install() {
     printf "${GREEN}✓ Binary installed:  $INSTALL_DIR/$BINARY_NAME${RESET}\n"
     printf "${GREEN}✓ Alias installed:   $INSTALL_DIR/$ALIAS_NAME${RESET}\n"
 
-    if [ -f "$INSTALL_DIR/config.toml" ]; then
-        printf "${GREEN}✓ config.toml already present — skipping (aliases preserved)${RESET}\n"
-    elif [ -f "default_config.toml" ]; then
-        cp "default_config.toml" "$INSTALL_DIR/config.toml"
-        printf "${GREEN}✓ config.toml generated${RESET}\n"
-    else
-        printf "${YELLOW}⚠ Run ldx --sync after install to generate config${RESET}\n"
-    fi
+    install_config
 
     cd "$HOME" || exit 1
 
@@ -135,6 +208,19 @@ do_install() {
         rm -rf "$CLONE_DIR"
         printf "${GREEN}✓ Source cleaned up${RESET}\n"
     fi
+}
+
+# ─── Install ──────────────────────────────────────────────────────────────────
+do_install() {
+    KEEP_SOURCE="$1"
+
+    # Fast path: try pre-built binary first (skip if keeping source)
+    if [ "$KEEP_SOURCE" = "false" ] && try_download_binary; then
+        return 0
+    fi
+
+    # Slow path: build from source
+    do_build_from_source "$KEEP_SOURCE"
 }
 
 # ─── Uninstall ────────────────────────────────────────────────────────────────

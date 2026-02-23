@@ -32,6 +32,10 @@ jobs:
       - name: Build
         run: cargo build --release
 
+      - name: Strip binary (Linux)
+        if: matrix.os == 'ubuntu-latest'
+        run: strip target/release/localdex
+
       - name: Rename binary
         shell: bash
         run: cp ${{ matrix.binary }} ${{ matrix.artifact }}
