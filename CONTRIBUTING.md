@@ -10,34 +10,29 @@ Thanks for your interest in contributing! ldx is a fast, parallel file search CL
 
 - [Rust](https://rustup.rs) (stable)
 - [Git](https://git-scm.com/)
-- Windows: [Git Bash](https://gitforwindows.org/) for running `.sh` scripts
+- Windows: [Git Bash](https://gitforwindows.org/) for running the install script
 
 ### Build & Install
 
 ```bash
-git clone https://github.com/dylanisaiahp/localdex
-cd localdex
-./scripts/dev.sh build
+curl -sSf https://raw.githubusercontent.com/dylanisaiahp/localdex/main/scripts/install.sh | sh
 ```
 
-Or install directly:
+Or clone and build manually:
 
 ```bash
-./install.sh
+git clone https://github.com/dylanisaiahp/localdex
+cd localdex
+cargo build --release
 ```
-
-See [README.md](README.md) for full installation instructions.
 
 ---
 
 ## Development Workflow
 
 ```bash
-# Build and install locally
-./scripts/dev.sh build
-
-# Build in debug mode
-./scripts/dev.sh build --debug
+# Build release binary
+cargo build --release
 
 # Lint — must be clean before submitting
 cargo clippy -- -D warnings
@@ -55,23 +50,10 @@ Please ensure `cargo clippy -- -D warnings` produces zero warnings before openin
 If you'd like to contribute benchmark results from your hardware, run:
 
 ```bash
-# Warm cache (run anytime)
-./scripts/dev.sh benchmark --runs 20 --warm
-
-# Cold cache (run immediately after reboot, before anything else)
-./scripts/dev.sh benchmark --runs 20 --cold
-
-# With live table output
-./scripts/dev.sh benchmark --runs 20 --live
+ldx bench --runs 10 --live
 ```
 
-Then open an issue or PR with the generated `.md` file attached. Please include your hardware specs (CPU, RAM, storage type). Results are credited in [BENCHMARKS.md](BENCHMARKS.md).
-
----
-
-## Roadmap
-
-Check [ROADMAP.md](ROADMAP.md) before starting work to avoid duplicating planned features. If you want to work on something not listed, open an issue first to discuss it.
+Then open an issue or PR with the generated `.md` file attached. Please include your hardware specs (CPU, RAM, storage type).
 
 ---
 
@@ -87,13 +69,12 @@ Check [ROADMAP.md](ROADMAP.md) before starting work to avoid duplicating planned
 
 ## Platform Testing
 
-ldx supports Windows, Linux, and macOS. If you're on Linux or macOS, your benchmark results and bug reports are especially valuable — most development so far has been on Windows.
+ldx supports Windows, Linux, and macOS. If you're on Linux or macOS, your benchmark results and bug reports are especially welcome.
 
 **Known platform notes:**
-- Windows: tested on Windows 11, Git Bash required for scripts
-- Linux: builds and runs, benchmarks not yet collected for v0.2.0
+- Windows: tested on Windows 11, Git Bash required for install script
+- Linux: actively developed and tested on CachyOS
 - macOS: builds and runs, benchmarks not yet collected
-- HDD benchmarks: cold cache numbers on a full HDD welcome
 
 ---
 
