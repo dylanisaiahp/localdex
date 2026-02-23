@@ -13,3 +13,5 @@ config.toml
 # Windows
 Thumbs.db
 Desktop.ini
+perf.data
+perf.data.old

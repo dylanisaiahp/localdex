@@ -126,7 +126,6 @@ impl Source for DirectorySource {
                     };
 
                     let e = Entry {
-                        name: entry.file_name().to_string_lossy().to_string(),
                         path: entry.path().to_path_buf(),
                         kind,
                         depth: entry.depth(),

@@ -48,13 +48,13 @@ struct NameMatcher {
 
 impl Matcher for NameMatcher {
     fn is_match(&self, entry: &parex::Entry) -> bool {
+        let name = entry.path.file_name()
+            .and_then(|n| n.to_str())
+            .unwrap_or("");
         if self.case_sensitive {
-            entry.name.contains(&self.pattern)
+            name.contains(&self.pattern)
         } else {
-            entry
-                .name
-                .to_lowercase()
-                .contains(&self.pattern.to_lowercase())
+            name.to_lowercase().contains(&self.pattern.to_lowercase())
         }
     }
 }
@@ -100,10 +100,13 @@ impl Matcher for DirMatcher {
         match &self.pattern {
             None => true,
             Some(pat) => {
+                let name = entry.path.file_name()
+                    .and_then(|n| n.to_str())
+                    .unwrap_or("");
                 if self.case_sensitive {
-                    entry.name.contains(pat)
+                    name.contains(pat)
                 } else {
-                    entry.name.to_lowercase().contains(&pat.to_lowercase())
+                    name.to_lowercase().contains(&pat.to_lowercase())
                 }
             }
         }

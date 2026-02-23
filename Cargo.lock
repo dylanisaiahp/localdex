@@ -264,7 +264,7 @@ dependencies = [
 
 [[package]]
 name = "localdex"
-version = "0.3.3"
+version = "0.3.4"
 dependencies = [
  "anyhow",
  "chrono",
@@ -311,9 +311,9 @@ checksum = "04744f49eae99ab78e0d5c0b603ab218f515ea8cfe5a456d7629ad883a3b6e7d"
 
 [[package]]
 name = "parex"
-version = "0.2.0"
+version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bac153db4440100ef348db8fe0016f9b6dcbea2b79803a45c9ffdab1fa575789"
+checksum = "08fd6304d0ff4c8b59d7a572e0db27d16d8c040c75932eb3521af7f549ab0787"
 dependencies = [
  "thiserror",
 ]
