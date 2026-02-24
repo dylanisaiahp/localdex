@@ -50,9 +50,15 @@ pub fn parse_bench_args(raw: &[String], config: &LdxConfig) -> Result<BenchArgs>
     let mut i = 0;
     while i < raw.len() {
         match raw[i].as_str() {
-            "--edit" => { edit = true; }
-            "--live" => { live = true; }
-            "--csv" => { csv = true; }
+            "--edit" => {
+                edit = true;
+            }
+            "--live" => {
+                live = true;
+            }
+            "--csv" => {
+                csv = true;
+            }
             "--runs" => {
                 i += 1;
                 runs = raw.get(i).and_then(|v| v.parse().ok()).unwrap_or(runs);
@@ -95,7 +101,15 @@ pub fn parse_bench_args(raw: &[String], config: &LdxConfig) -> Result<BenchArgs>
     default_dirs.push(PathBuf::from("/"));
     default_dirs.extend(dirs);
 
-    Ok(BenchArgs { threads, runs, dirs: default_dirs, out, live, csv, edit })
+    Ok(BenchArgs {
+        threads,
+        runs,
+        dirs: default_dirs,
+        out,
+        live,
+        csv,
+        edit,
+    })
 }
 
 // ---------------------------------------------------------------------------
@@ -139,7 +153,11 @@ pub fn run(raw: &[String], config: &LdxConfig) -> Result<()> {
     println!("  Runs    : {}", args.runs);
     println!(
         "  Dirs    : {}",
-        args.dirs.iter().map(|d| d.display().to_string()).collect::<Vec<_>>().join(", ")
+        args.dirs
+            .iter()
+            .map(|d| d.display().to_string())
+            .collect::<Vec<_>>()
+            .join(", ")
     );
     println!();
 
@@ -169,7 +187,10 @@ pub fn run(raw: &[String], config: &LdxConfig) -> Result<()> {
 
 fn print_bench_help() {
     println!();
-    println!("  {} ldx bench — benchmark ldx against your filesystem", colored::Colorize::cyan("🔍"));
+    println!(
+        "  {} ldx bench — benchmark ldx against your filesystem",
+        colored::Colorize::cyan("🔍")
+    );
     println!();
     println!("  Usage: ldx bench [options]");
     println!();

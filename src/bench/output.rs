@@ -20,17 +20,25 @@ pub fn save_markdown(results: &[BenchResult], config: &BenchConfig, path: &PathB
 
     let mut by_dir: HashMap<String, Vec<&BenchResult>> = HashMap::new();
     for r in results {
-        by_dir.entry(r.dir.display().to_string()).or_default().push(r);
+        by_dir
+            .entry(r.dir.display().to_string())
+            .or_default()
+            .push(r);
     }
 
     for dir in &config.dirs {
         let key = dir.display().to_string();
-        let Some(dir_results) = by_dir.get(&key) else { continue; };
+        let Some(dir_results) = by_dir.get(&key) else {
+            continue;
+        };
 
         out.push_str(&format!("## {}\n\n", key));
 
         if let Some(first) = dir_results.first() {
-            out.push_str(&format!("**Entries scanned:** {}\n\n", fmt_num(first.entries)));
+            out.push_str(&format!(
+                "**Entries scanned:** {}\n\n",
+                fmt_num(first.entries)
+            ));
         }
 
         out.push_str("| Tool | Avg (entries/s) | Median | Min | Max |\n");
@@ -71,8 +79,14 @@ pub fn save_csv(results: &[BenchResult], path: &PathBuf) -> Result<()> {
     for r in results {
         out.push_str(&format!(
             "{},{},{},{:.0},{:.0},{:.0},{:.0},{}\n",
-            r.tool, r.dir.display(), r.entries,
-            r.avg, r.median, r.min, r.max, r.runs,
+            r.tool,
+            r.dir.display(),
+            r.entries,
+            r.avg,
+            r.median,
+            r.min,
+            r.max,
+            r.runs,
         ));
     }
 

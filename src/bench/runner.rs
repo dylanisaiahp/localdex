@@ -106,7 +106,10 @@ fn bench_ldx(dir: &PathBuf, config: &BenchConfig) -> Option<BenchResult> {
     let mut entries = 0usize;
 
     for i in 0..config.runs {
-        progress(config.live, &format!("ldx  {} [{}/{}]", dir.display(), i + 1, config.runs));
+        progress(
+            config.live,
+            &format!("ldx  {} [{}/{}]", dir.display(), i + 1, config.runs),
+        );
 
         let result = scan_dir(dir, &search_config);
         let e = result.files + result.dirs;
@@ -132,14 +135,20 @@ fn bench_ldx(dir: &PathBuf, config: &BenchConfig) -> Option<BenchResult> {
     if config.live {
         println!(
             "    ldx  avg {} | med {} | min {} | max {} entries/s",
-            fmt_speed(avg), fmt_speed(median), fmt_speed(min), fmt_speed(max)
+            fmt_speed(avg),
+            fmt_speed(median),
+            fmt_speed(min),
+            fmt_speed(max)
         );
     }
 
     Some(BenchResult {
         tool: "ldx".to_string(),
         dir: dir.clone(),
-        avg, median, min, max,
+        avg,
+        median,
+        min,
+        max,
         runs: config.runs,
         entries,
     })
@@ -154,7 +163,10 @@ fn bench_competitor(tool: &str, dir: &PathBuf, config: &BenchConfig) -> Option<B
     let mut entries = 0usize;
 
     for i in 0..config.runs {
-        progress(config.live, &format!("{}  {} [{}/{}]", tool, dir.display(), i + 1, config.runs));
+        progress(
+            config.live,
+            &format!("{}  {} [{}/{}]", tool, dir.display(), i + 1, config.runs),
+        );
 
         let start = Instant::now();
 
@@ -175,13 +187,23 @@ fn bench_competitor(tool: &str, dir: &PathBuf, config: &BenchConfig) -> Option<B
         let elapsed = start.elapsed().as_secs_f64();
 
         if let Ok(out) = output {
-            let e = out.stdout.split(|&b| b == b'\n').filter(|l| !l.is_empty()).count();
+            let e = out
+                .stdout
+                .split(|&b| b == b'\n')
+                .filter(|l| !l.is_empty())
+                .count();
             if elapsed > 0.0 && e > 0 {
                 let speed = e as f64 / elapsed;
                 speeds.push(speed);
                 entries = e;
                 if config.live {
-                    println!("    {}  run {:>2}  {} entries/s  ({} entries)", tool, i + 1, fmt_speed(speed), e);
+                    println!(
+                        "    {}  run {:>2}  {} entries/s  ({} entries)",
+                        tool,
+                        i + 1,
+                        fmt_speed(speed),
+                        e
+                    );
                 }
             }
         }
@@ -197,14 +219,21 @@ fn bench_competitor(tool: &str, dir: &PathBuf, config: &BenchConfig) -> Option<B
     if config.live {
         println!(
             "    {}  avg {} | med {} | min {} | max {} entries/s",
-            tool, fmt_speed(avg), fmt_speed(median), fmt_speed(min), fmt_speed(max)
+            tool,
+            fmt_speed(avg),
+            fmt_speed(median),
+            fmt_speed(min),
+            fmt_speed(max)
         );
     }
 
     Some(BenchResult {
         tool: tool.to_string(),
         dir: dir.clone(),
-        avg, median, min, max,
+        avg,
+        median,
+        min,
+        max,
         runs: config.runs,
         entries,
     })
@@ -219,7 +248,9 @@ fn fmt_speed(n: f64) -> String {
     let s = n.to_string();
     let mut result = String::new();
     for (i, c) in s.chars().rev().enumerate() {
-        if i > 0 && i % 3 == 0 { result.push(','); }
+        if i > 0 && i % 3 == 0 {
+            result.push(',');
+        }
         result.push(c);
     }
     result.chars().rev().collect()
@@ -253,7 +284,9 @@ pub fn run_benchmark(config: &BenchConfig) -> Result<Vec<BenchResult>> {
             }
         }
 
-        if config.live { println!(); }
+        if config.live {
+            println!();
+        }
         println!("  ✓ {}", dir.display());
     }
 

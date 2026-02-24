@@ -93,9 +93,13 @@ mod tests {
 
     fn make_flag(os: &str) -> FlagDef {
         FlagDef {
-            short: "q".into(), long: "quiet".into(),
-            description: "Quiet".into(), os: os.into(),
-            action: None, target: None, value: None,
+            short: "q".into(),
+            long: "quiet".into(),
+            description: "Quiet".into(),
+            os: os.into(),
+            action: None,
+            target: None,
+            value: None,
         }
     }
 
@@ -125,6 +129,10 @@ mod tests {
     #[test]
     fn default_config_is_valid_toml() {
         let result = toml::from_str::<LdxConfig>(DEFAULT_CONFIG);
-        assert!(result.is_ok(), "DEFAULT_CONFIG failed to parse: {:?}", result.err());
+        assert!(
+            result.is_ok(),
+            "DEFAULT_CONFIG failed to parse: {:?}",
+            result.err()
+        );
     }
 }

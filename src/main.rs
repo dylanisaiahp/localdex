@@ -8,18 +8,18 @@ use anyhow::Result;
 use dirs::home_dir;
 use std::path::PathBuf;
 
-use colored::Colorize;
-use config::{check_config, config_path, load_config, reset_config, sync_config};
 #[cfg(windows)]
 use cli::display::fmt_num;
 use cli::display::{print_help, print_result, print_stats};
 use cli::flags::{ParsedFlags, parse_args};
 use cli::launcher::{open_file, prompt_and_open};
+use colored::Colorize;
+use config::{check_config, config_path, load_config, reset_config, sync_config};
 use search::{Config, ScanResult, scan_dir};
 #[cfg(windows)]
-use std::time::Instant;
-#[cfg(windows)]
 use source::get_all_drives;
+#[cfg(windows)]
+use std::time::Instant;
 
 // ---------------------------------------------------------------------------
 // Build search::Config from parsed flags

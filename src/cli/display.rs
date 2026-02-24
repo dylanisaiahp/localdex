@@ -30,12 +30,18 @@ pub fn print_help(config: &LdxConfig) {
     );
     println!(
         "  {}",
-        format!("v{} · github.com/dylanisaiahp/localdex", env!("CARGO_PKG_VERSION")).dimmed()
+        format!(
+            "v{} · github.com/dylanisaiahp/localdex",
+            env!("CARGO_PKG_VERSION")
+        )
+        .dimmed()
     );
     println!();
     println!(
         "  {} {} {}",
-        "Usage:".bold(), "ldx".bright_cyan(), "[pattern] [options]".dimmed()
+        "Usage:".bold(),
+        "ldx".bright_cyan(),
+        "[pattern] [options]".dimmed()
     );
     println!();
     println!(
@@ -46,7 +52,11 @@ pub fn print_help(config: &LdxConfig) {
     println!();
     println!("  {}", "Flags:".bold());
 
-    let mut flags: Vec<&FlagDef> = config.flags.values().filter(|f| is_flag_available(f)).collect();
+    let mut flags: Vec<&FlagDef> = config
+        .flags
+        .values()
+        .filter(|f| is_flag_available(f))
+        .collect();
     flags.sort_by(|a, b| a.long.cmp(&b.long));
 
     for flag in &flags {
@@ -69,7 +79,12 @@ pub fn print_help(config: &LdxConfig) {
     println!();
     println!("  {}", "Management:".bold());
     for (flag, desc) in mgmt {
-        println!("    {}  {:<28} {}", "  ".dimmed(), flag.cyan(), desc.dimmed());
+        println!(
+            "    {}  {:<28} {}",
+            "  ".dimmed(),
+            flag.cyan(),
+            desc.dimmed()
+        );
     }
 
     if !config.aliases.is_empty() {
@@ -78,7 +93,12 @@ pub fn print_help(config: &LdxConfig) {
         let mut aliases: Vec<(&String, &String)> = config.aliases.iter().collect();
         aliases.sort_by_key(|(k, _)| k.as_str());
         for (name, expansion) in &aliases {
-            println!("    {:<16} {}  {}", name.bright_cyan(), "→".dimmed(), expansion.dimmed());
+            println!(
+                "    {:<16} {}  {}",
+                name.bright_cyan(),
+                "→".dimmed(),
+                expansion.dimmed()
+            );
         }
     }
 

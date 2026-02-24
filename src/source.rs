@@ -6,6 +6,9 @@ use parex::Source;
 use parex::engine::WalkConfig;
 use parex::{Entry, EntryKind, ParexError};
 
+// Batch size for channel sends — reduces contention dramatically
+const BATCH_SIZE: usize = 128;
+
 // ---------------------------------------------------------------------------
 // DirectorySource
 // ---------------------------------------------------------------------------
@@ -62,19 +65,42 @@ impl Source for DirectorySource {
         let exclude = self.exclude.clone();
         let dirs_only = self.dirs_only;
 
-        // Channel to send entries and errors
-        let (tx, rx) = mpsc::channel::<Result<Entry, ParexError>>();
+        // Batched channel — sends Vec<Result<Entry>> instead of one at a time
+        let (tx, rx) = mpsc::channel::<Vec<Result<Entry, ParexError>>>();
 
         std::thread::spawn(move || {
             builder.build_parallel().run(|| {
                 let tx = tx.clone();
                 let exclude = exclude.clone();
+
+                // Flush-on-drop wrapper — ensures partial batch is sent when worker closes
+                struct BatchFlusher {
+                    batch: Vec<Result<Entry, ParexError>>,
+                    tx: mpsc::Sender<Vec<Result<Entry, ParexError>>>,
+                }
+                impl Drop for BatchFlusher {
+                    fn drop(&mut self) {
+                        if !self.batch.is_empty() {
+                            let _ = self.tx.send(std::mem::take(&mut self.batch));
+                        }
+                    }
+                }
+
+                let mut flusher = BatchFlusher {
+                    batch: Vec::with_capacity(BATCH_SIZE),
+                    tx: tx.clone(),
+                };
+
                 Box::new(move |res| {
                     use ignore::WalkState;
 
-                    // Always send errors immediately
+                    // Always flush errors immediately
                     if let Err(err) = res {
-                        let _ = tx.send(Err(map_ignore_error(err)));
+                        if !flusher.batch.is_empty() {
+                            let _ = tx.send(std::mem::take(&mut flusher.batch));
+                            flusher.batch = Vec::with_capacity(BATCH_SIZE);
+                        }
+                        let _ = tx.send(vec![Err(map_ignore_error(err))]);
                         return WalkState::Continue;
                     }
 
@@ -93,21 +119,24 @@ impl Source for DirectorySource {
 
                     // Forward unreadable directories as errors
                     if is_dir && let Err(e) = std::fs::read_dir(entry.path()) {
-                        let pe = if e.kind() == std::io::ErrorKind::PermissionDenied {
-                            ParexError::PermissionDenied(entry.path().to_path_buf())
-                        } else {
-                            ParexError::Io {
-                                path: entry.path().to_path_buf(),
-                                source: e,
+                            let pe = if e.kind() == std::io::ErrorKind::PermissionDenied {
+                                ParexError::PermissionDenied(entry.path().to_path_buf())
+                            } else {
+                                ParexError::Io {
+                                    path: entry.path().to_path_buf(),
+                                    source: e,
+                                }
+                            };
+                            if !flusher.batch.is_empty() {
+                                let _ = tx.send(std::mem::take(&mut flusher.batch));
+                                flusher.batch = Vec::with_capacity(BATCH_SIZE);
                             }
-                        };
-                        let _ = tx.send(Err(pe));
-                        return WalkState::Continue;
-                    }
+                            let _ = tx.send(vec![Err(pe)]);
+                            return WalkState::Continue;
+                        }
 
                     // Skip excluded directories
-                    if is_dir && exclude.contains(&entry.file_name().to_string_lossy().to_string())
-                    {
+                    if is_dir && exclude.contains(&entry.file_name().to_string_lossy().to_string()) {
                         return WalkState::Skip;
                     }
 
@@ -125,20 +154,25 @@ impl Source for DirectorySource {
                         EntryKind::File
                     };
 
-                    let e = Entry {
+                    flusher.batch.push(Ok(Entry {
                         path: entry.path().to_path_buf(),
                         kind,
                         depth: entry.depth(),
                         metadata: None,
-                    };
+                    }));
 
-                    let _ = tx.send(Ok(e));
+                    if flusher.batch.len() >= BATCH_SIZE {
+                        let _ = tx.send(std::mem::take(&mut flusher.batch));
+                        flusher.batch = Vec::with_capacity(BATCH_SIZE);
+                    }
+
                     WalkState::Continue
                 })
             });
         });
 
-        Box::new(rx.into_iter())
+        // Flatten batches back into individual items for the parex engine
+        Box::new(rx.into_iter().flatten())
     }
 }
 
