@@ -172,7 +172,7 @@ fn bench_competitor(tool: &str, dir: &PathBuf, config: &BenchConfig) -> Option<B
 
         let output = match tool {
             "fd" => std::process::Command::new("fd")
-                .args(["--no-ignore", "--hidden", "."])
+                .args(["--no-ignore", "--hidden", "--type", "f", "."])
                 .arg(dir)
                 .stderr(std::process::Stdio::null())
                 .output(),
