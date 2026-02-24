@@ -1,10 +1,9 @@
 [package]
 name = "localdex"
-version = "0.4.4"
+version = "0.4.5"
 edition = "2024"
 
 [dependencies]
-ignore = "0.4.25"
 anyhow = "1.0.101"
 colored = "3.1.1"
 dirs = "6.0.0"
@@ -12,6 +11,7 @@ parex = "0.3.1"
 serde = { version = "1.0.228", features = ["derive"] }
 toml = "1.0.1"
 chrono = "0.4.43"
+parawalk = "0.1.0"
 
 [profile.release]
 debug = true
