@@ -311,9 +311,9 @@ checksum = "04744f49eae99ab78e0d5c0b603ab218f515ea8cfe5a456d7629ad883a3b6e7d"
 
 [[package]]
 name = "parex"
-version = "0.3.0"
+version = "0.3.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "08fd6304d0ff4c8b59d7a572e0db27d16d8c040c75932eb3521af7f549ab0787"
+checksum = "9343b6c940e924da43c3741c5daa8742af2ff084d0d10fcb40896ee8b94d3eda"
 dependencies = [
  "thiserror",
 ]
