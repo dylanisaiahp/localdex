@@ -8,6 +8,44 @@ use parex::{Entry, EntryKind, ParexError};
 
 const BATCH_SIZE: usize = 128;
 
+// ---------------------------------------------------------------------------
+// BatchSender — flushes remaining entries on drop
+// ---------------------------------------------------------------------------
+
+struct BatchSender {
+    tx: mpsc::Sender<Vec<Entry>>,
+    batch: Vec<Entry>,
+}
+
+impl BatchSender {
+    fn new(tx: mpsc::Sender<Vec<Entry>>) -> Self {
+        Self {
+            tx,
+            batch: Vec::with_capacity(BATCH_SIZE),
+        }
+    }
+
+    fn push(&mut self, entry: Entry) {
+        self.batch.push(entry);
+        if self.batch.len() >= BATCH_SIZE {
+            let _ = self.tx.send(std::mem::take(&mut self.batch));
+            self.batch = Vec::with_capacity(BATCH_SIZE);
+        }
+    }
+}
+
+impl Drop for BatchSender {
+    fn drop(&mut self) {
+        if !self.batch.is_empty() {
+            let _ = self.tx.send(std::mem::take(&mut self.batch));
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// DirectorySource
+// ---------------------------------------------------------------------------
+
 pub struct DirectorySource {
     pub root: PathBuf,
     pub exclude: Vec<String>,
@@ -68,9 +106,9 @@ impl Source for DirectorySource {
                     true
                 }),
                 move || {
-                    // Each thread gets its own batch — no locking needed
-                    let tx = tx_visitor.clone();
-                    let mut batch: Vec<Entry> = Vec::with_capacity(BATCH_SIZE);
+                    // Each thread gets its own BatchSender — no locking needed.
+                    // Drop impl ensures partial batches are flushed when walk ends.
+                    let mut sender = BatchSender::new(tx_visitor.clone());
 
                     move |walked: parawalk::Entry| {
                         let kind = match walked.kind {
@@ -80,17 +118,12 @@ impl Source for DirectorySource {
                             WalkKind::Other => return,
                         };
 
-                        batch.push(Entry {
+                        sender.push(Entry {
                             path: walked.path,
                             kind,
                             depth: walked.depth,
                             metadata: None,
                         });
-
-                        if batch.len() >= BATCH_SIZE {
-                            let _ = tx.send(std::mem::take(&mut batch));
-                            batch = Vec::with_capacity(BATCH_SIZE);
-                        }
                     }
                 },
             );
